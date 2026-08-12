@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Videotagebuch</title>
+
+<!--
+  ============================================================
+   VIDEOTAGEBUCH – Ansichtsseite
+  ============================================================
+
+   Eine einzige Datei, kein Build, kein npm.
+   Läuft auf GitHub Pages.
+
+   Was sie tut: meldet dich mit deinem Projekt-Konto bei Google
+   an, liest den geteilten Drive-Ordner aus und zeigt die Videos
+   der letzten 30 Tage.
+
+   Sie kann NICHTS verändern oder löschen – der Zugriff ist
+   ausdrücklich nur lesend (Scope drive.readonly).
+
+   Einrichtung: siehe README.md
+  ============================================================
+-->
+
+<style>
+  :root {
+    --rand: #ddd;
+    --grau: #666;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    padding: 1rem;
+    max-width: 900px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--rand);
+    padding-bottom: .75rem;
+    margin-bottom: 1.5rem;
+  }
+  h1 { font-size: 1.25rem; margin: 0; }
+  #konto { color: var(--grau); font-size: .85rem; margin-left: auto; }
+  button {
+    font: inherit;
+    padding: .4rem .8rem;
+    border: 1px solid var(--rand);
+    background: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  button:hover { background: #f5f5f5; }
+
+  .tag { margin-bottom: 2rem; }
+  .tag > h2 {
+    font-size: .95rem;
+    font-weight: 600;
+    margin: 0 0 .6rem;
+    padding-bottom: .3rem;
+    border-bottom: 1px solid var(--rand);
+  }
+  .tag > h2 span { font-weight: 400; color: var(--grau); }
+
+  .raster {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: .75rem;
+  }
+  .karte { border: 1px solid var(--rand); border-radius: 4px; overflow: hidden; }
+  .karte .vorschau {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+  }
+  .karte .vorschau img { width: 100%; height: 100%; object-fit: cover; }
+  .karte .vorschau .play {
+    position: absolute;
+    font-size: 1.5rem;
+    color: #fff;
+    text-shadow: 0 0 8px rgba(0,0,0,.7);
+    pointer-events: none;
+  }
+  .karte video, .karte img.voll { width: 100%; display: block; }
+  .karte .info { padding: .5rem .6rem; font-size: .8rem; }
+  .karte .info .person { font-weight: 600; }
+  .karte .info .meta { color: var(--grau); }
+  .karte .info .bald { color: #b00; }
+  .karte .aktionen { padding: 0 .6rem .6rem; }
+  .karte .aktionen button { font-size: .75rem; padding: .2rem .5rem; }
+
+  #status { color: var(--grau); }
+  #fehler {
+    color: #b00;
+    white-space: pre-wrap;
+    font-size: .85rem;
+    border: 1px solid #b00;
+    padding: .75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Videotagebuch</h1>
+  <button id="anmelden">Mit Google anmelden</button>
+  <button id="neuladen" hidden>Neu laden</button>
+  <span id="konto"></span>
+</header>
+
+<div id="fehler" hidden></div>
+<p id="status">Nicht angemeldet.</p>
+<main id="inhalt"></main>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+// ============ EINSTELLUNGEN ============
+
+const CONFIG = {
+
+  // Aus der Google Cloud Console, siehe README Schritt 3.
+  // Sieht aus wie: 1234567890-abc...xyz.apps.googleusercontent.com
+  CLIENT_ID: 'HIER_CLIENT_ID_EINFUEGEN',
+
+  // Der Hauptordner "Videotagebuch"
+  ORDNER_ID: '1quX3ETKLsfNxEIsOpiOXHOgrcbtJnsBb',
+
+  AUFBEWAHRUNG_TAGE: 30
+};
+
+
+// ============ ZUSTAND ============
+
+let token = null;
+let tokenClient = null;
+
+const el = {
+  anmelden: document.getElementById('anmelden'),
+  neuladen: document.getElementById('neuladen'),
+  konto:    document.getElementById('konto'),
+  status:   document.getElementById('status'),
+  fehler:   document.getElementById('fehler'),
+  inhalt:   document.getElementById('inhalt')
+};
+
+
+// ============ ANMELDUNG ============
+
+window.onload = function () {
+  if (CONFIG.CLIENT_ID.indexOf('apps.googleusercontent.com') === -1) {
+    zeigeFehler('Es ist noch keine CLIENT_ID eingetragen.\n'
+              + 'Siehe README.md, Schritt 3.');
+    el.anmelden.disabled = true;
+    return;
+  }
+
+  const warten = setInterval(function () {
+    if (!window.google || !google.accounts) return;
+    clearInterval(warten);
+
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CONFIG.CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      callback: function (antwort) {
+        if (antwort.error) {
+          zeigeFehler('Anmeldung fehlgeschlagen: ' + antwort.error);
+          return;
+        }
+        token = antwort.access_token;
+        el.anmelden.hidden = true;
+        el.neuladen.hidden = false;
+        laden();
+      }
+    });
+  }, 100);
+};
+
+el.anmelden.onclick = function () { tokenClient.requestAccessToken(); };
+el.neuladen.onclick = function () { laden(); };
+
+
+// ============ DRIVE ============
+
+async function drive(pfad, params) {
+  const url = new URL('https://www.googleapis.com/drive/v3/' + pfad);
+  Object.keys(params || {}).forEach(function (k) {
+    url.searchParams.set(k, params[k]);
+  });
+
+  const antwort = await fetch(url, {
+    headers: { Authorization: 'Bearer ' + token }
+  });
+
+  if (antwort.status === 401) {
+    token = null;
+    tokenClient.requestAccessToken({ prompt: '' });
+    throw new Error('Sitzung abgelaufen, bitte neu anmelden.');
+  }
+  if (!antwort.ok) {
+    throw new Error('Drive antwortete mit ' + antwort.status + ':\n'
+                    + (await antwort.text()));
+  }
+  return antwort.json();
+}
+
+/** Alle Dateien aus dem Hauptordner und allen Unterordnern. */
+async function alleDateien() {
+  const unterordner = await drive('files', {
+    q: "'" + CONFIG.ORDNER_ID + "' in parents"
+       + " and mimeType='application/vnd.google-apps.folder'"
+       + " and trashed=false",
+    fields: 'files(id,name)',
+    pageSize: 100
+  });
+
+  // Der Hauptordner selbst zählt mit, falls jemand direkt dort ablegt
+  const quellen = [{ id: CONFIG.ORDNER_ID, name: '(Hauptordner)' }]
+                    .concat(unterordner.files);
+
+  const ergebnis = [];
+
+  for (const ordner of quellen) {
+    const inhalt = await drive('files', {
+      q: "'" + ordner.id + "' in parents"
+         + " and mimeType!='application/vnd.google-apps.folder'"
+         + " and trashed=false",
+      fields: 'files(id,name,mimeType,createdTime,size,thumbnailLink,owners(displayName,emailAddress))',
+      orderBy: 'createdTime desc',
+      pageSize: 200
+    });
+
+    inhalt.files.forEach(function (datei) {
+      datei.ordner = ordner.name;
+      ergebnis.push(datei);
+    });
+  }
+
+  return ergebnis;
+}
+
+
+// ============ ANZEIGE ============
+
+async function laden() {
+  el.fehler.hidden = true;
+  el.status.hidden = false;
+  el.status.textContent = 'Lade …';
+  el.inhalt.innerHTML = '';
+
+  try {
+    const dateien = await alleDateien();
+
+    // Wer bin ich?
+    if (dateien.length && dateien[0].owners) {
+      el.konto.textContent = '';
+    }
+
+    if (!dateien.length) {
+      el.status.textContent = 'Noch nichts da.';
+      return;
+    }
+
+    el.status.hidden = true;
+
+    // nach Tag gruppieren
+    const tage = {};
+    dateien.forEach(function (d) {
+      const schluessel = new Date(d.createdTime).toLocaleDateString('de-DE');
+      (tage[schluessel] = tage[schluessel] || []).push(d);
+    });
+
+    Object.keys(tage)
+      .sort(function (a, b) { return datum(b) - datum(a); })
+      .forEach(function (tag) {
+        el.inhalt.appendChild(tagBlock(tag, tage[tag]));
+      });
+
+  } catch (fehler) {
+    el.status.hidden = true;
+    zeigeFehler(fehler.message);
+  }
+}
+
+function datum(deutsch) {
+  const t = deutsch.split('.');
+  return new Date(t[2], t[1] - 1, t[0]).getTime();
+}
+
+function tagBlock(tag, dateien) {
+  const block = document.createElement('section');
+  block.className = 'tag';
+
+  const rest = tageBisLoeschung(dateien[0].createdTime);
+  const kopf = document.createElement('h2');
+  kopf.innerHTML = tag + ' <span>· ' + dateien.length + ' Video'
+                 + (dateien.length > 1 ? 's' : '')
+                 + ' · noch ' + rest + ' Tage</span>';
+  block.appendChild(kopf);
+
+  const raster = document.createElement('div');
+  raster.className = 'raster';
+  dateien.forEach(function (d) { raster.appendChild(karte(d)); });
+  block.appendChild(raster);
+
+  return block;
+}
+
+function tageBisLoeschung(erstellt) {
+  const weg = new Date(erstellt).getTime()
+            + CONFIG.AUFBEWAHRUNG_TAGE * 86400000;
+  return Math.max(0, Math.ceil((weg - Date.now()) / 86400000));
+}
+
+function karte(datei) {
+  const k = document.createElement('div');
+  k.className = 'karte';
+
+  const vorschau = document.createElement('div');
+  vorschau.className = 'vorschau';
+
+  if (datei.thumbnailLink) {
+    const bild = document.createElement('img');
+    bild.src = datei.thumbnailLink.replace(/=s\d+$/, '=s400');
+    bild.referrerPolicy = 'no-referrer';
+    bild.alt = '';
+    vorschau.appendChild(bild);
+  }
+  if (datei.mimeType.indexOf('video/') === 0) {
+    const play = document.createElement('div');
+    play.className = 'play';
+    play.textContent = '▶';
+    vorschau.appendChild(play);
+  }
+  vorschau.onclick = function () { oeffnen(datei, k, vorschau); };
+  k.appendChild(vorschau);
+
+  const rest = tageBisLoeschung(datei.createdTime);
+  const info = document.createElement('div');
+  info.className = 'info';
+  info.innerHTML =
+      '<div class="person">' + escape_(datei.ordner) + '</div>'
+    + '<div class="meta">' + escape_(datei.name) + ' · '
+    + mb(datei.size) + ' MB</div>'
+    + '<div class="' + (rest <= 3 ? 'bald' : 'meta') + '">noch '
+    + rest + ' Tage</div>';
+  k.appendChild(info);
+
+  const aktionen = document.createElement('div');
+  aktionen.className = 'aktionen';
+  const knopf = document.createElement('button');
+  knopf.textContent = 'Herunterladen';
+  knopf.onclick = function () { herunterladen(datei, knopf); };
+  aktionen.appendChild(knopf);
+  k.appendChild(aktionen);
+
+  return k;
+}
+
+/** Datei laden und im Browser abspielen bzw. anzeigen. */
+async function oeffnen(datei, karte, vorschau) {
+  if (karte.dataset.offen) return;
+  karte.dataset.offen = '1';
+
+  const platzhalter = document.createElement('div');
+  platzhalter.className = 'vorschau';
+  platzhalter.textContent = 'lädt …';
+  vorschau.replaceWith(platzhalter);
+
+  try {
+    const url = await blobUrl(datei, function (prozent) {
+      platzhalter.textContent = 'lädt … ' + prozent + '%';
+    });
+
+    let anzeige;
+    if (datei.mimeType.indexOf('video/') === 0) {
+      anzeige = document.createElement('video');
+      anzeige.controls = true;
+      anzeige.autoplay = true;
+      anzeige.playsInline = true;
+    } else {
+      anzeige = document.createElement('img');
+      anzeige.className = 'voll';
+    }
+    anzeige.src = url;
+    platzhalter.replaceWith(anzeige);
+
+  } catch (fehler) {
+    platzhalter.textContent = 'Fehler';
+    zeigeFehler(fehler.message);
+    delete karte.dataset.offen;
+  }
+}
+
+async function herunterladen(datei, knopf) {
+  const beschriftung = knopf.textContent;
+  knopf.disabled = true;
+
+  try {
+    const url = await blobUrl(datei, function (p) {
+      knopf.textContent = p + ' %';
+    });
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = datei.name;
+    a.click();
+    knopf.textContent = beschriftung;
+  } catch (fehler) {
+    knopf.textContent = 'Fehler';
+    zeigeFehler(fehler.message);
+  } finally {
+    knopf.disabled = false;
+  }
+}
+
+/** Lädt die Datei mit Fortschrittsanzeige und gibt eine lokale URL zurück. */
+async function blobUrl(datei, fortschritt) {
+  if (datei._url) return datei._url;
+
+  const antwort = await fetch(
+    'https://www.googleapis.com/drive/v3/files/' + datei.id + '?alt=media',
+    { headers: { Authorization: 'Bearer ' + token } }
+  );
+  if (!antwort.ok) {
+    throw new Error('Konnte Datei nicht laden (' + antwort.status + ')');
+  }
+
+  const gesamt = Number(datei.size || 0);
+  const leser = antwort.body.getReader();
+  const teile = [];
+  let geladen = 0;
+
+  while (true) {
+    const { done, value } = await leser.read();
+    if (done) break;
+    teile.push(value);
+    geladen += value.length;
+    if (gesamt && fortschritt) {
+      fortschritt(Math.round(geladen / gesamt * 100));
+    }
+  }
+
+  datei._url = URL.createObjectURL(
+    new Blob(teile, { type: datei.mimeType })
+  );
+  return datei._url;
+}
+
+
+// ============ KLEINKRAM ============
+
+function mb(bytes) { return Math.round((Number(bytes) || 0) / 1048576); }
+
+function escape_(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+function zeigeFehler(text) {
+  el.fehler.textContent = text;
+  el.fehler.hidden = false;
+}
+</script>
+</body>
+</html>
