@@ -212,6 +212,74 @@
   #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .9rem; }
   #overlay .ersatz p { color: var(--grau); }
 
+  /* ---- Zusammenstellen vor dem Hochladen ---- */
+  #composer {
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: .75rem;
+    margin-bottom: 1.25rem;
+  }
+  #composer .kopf { margin-bottom: .6rem; }
+  #composer .hinweis {
+    display: block;
+    font-size: .8rem;
+    color: var(--grau);
+  }
+  #composer-liste {
+    list-style: none;
+    margin: 0 0 .75rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+  }
+  .eintrag {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    border: 1px solid var(--rand);
+    border-radius: 4px;
+    padding: .4rem;
+    background: #fff;
+  }
+  .eintrag .nr {
+    font-size: .8rem;
+    color: var(--grau);
+    width: 1.2rem;
+    text-align: center;
+    flex: 0 0 auto;
+  }
+  .eintrag .mini {
+    width: 54px;
+    height: 54px;
+    flex: 0 0 54px;
+    background: #eee;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .eintrag .mini img, .eintrag .mini video {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .eintrag .beschriftung {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: .8rem;
+  }
+  .eintrag .beschriftung .dateiname {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .eintrag .beschriftung .klein { color: var(--grau); font-size: .75rem; }
+  .eintrag .knoepfe { display: flex; gap: .25rem; flex: 0 0 auto; }
+  .eintrag .knoepfe button {
+    padding: .3rem .5rem;
+    min-width: 2rem;
+    line-height: 1;
+  }
+  .composer-aktionen { display: flex; gap: .5rem; flex-wrap: wrap; }
+  #absenden { border-color: #333; font-weight: 600; }
+
   /* ---- Listenansicht (schmale Bildschirme) ----
      Ein Tag pro Zeile, heute oben, nach unten in die Vergangenheit. */
   #liste { display: flex; flex-direction: column; gap: .5rem; }
@@ -321,6 +389,20 @@
   <div id="balken" hidden><div></div></div>
 </div>
 
+<section id="composer" hidden>
+  <div class="kopf">
+    <strong id="composer-titel"></strong>
+    <span class="hinweis">Reihenfolge festlegen, ansehen, dann abschicken.</span>
+  </div>
+  <ol id="composer-liste"></ol>
+  <div class="composer-aktionen">
+    <button id="vorschau">Vorschau ansehen</button>
+    <button id="mehr">Weitere hinzufügen</button>
+    <button id="absenden">Hochladen</button>
+    <button id="verwerfen">Verwerfen</button>
+  </div>
+</section>
+
 <div id="fehler" hidden></div>
 <p id="status">Nicht angemeldet.</p>
 
@@ -349,6 +431,10 @@ const CONFIG = {
   ORDNER_ID: '1quX3ETKLsfNxEIsOpiOXHOgrcbtJnsBb',
 
   AUFBEWAHRUNG_TAGE: 30,
+
+  // Wie lange ein Bild beim Abspielen stehen bleibt, bevor der
+  // nächste Clip kommt.
+  BILD_SEKUNDEN: 4,
 
   // Wer wann dran ist.
   //
@@ -397,6 +483,9 @@ const el = {
   datei:     document.getElementById('datei'),
   hlStatus:  document.getElementById('hochladen-status'),
   balken:    document.getElementById('balken'),
+  composer:  document.getElementById('composer'),
+  cTitel:    document.getElementById('composer-titel'),
+  cListe:    document.getElementById('composer-liste'),
   leiste:    document.getElementById('wochenleiste'),
   titel:     document.getElementById('wochentitel'),
   dran:      document.getElementById('dran'),
@@ -914,6 +1003,7 @@ document.addEventListener('keydown', function (e) {
 });
 
 function schliesseOverlay() {
+  clearTimeout(bildTimer);
   el.overlay.hidden = true;
   el.overlayIn.innerHTML = '';
 }
@@ -924,6 +1014,7 @@ function schliesseOverlay() {
  * während des laufenden geladen, damit der Übergang nicht hakt.
  */
 let wiedergabe = { liste: [], index: 0 };
+let bildTimer = null;
 
 function oeffneOverlay(eingabe, start) {
   wiedergabe.liste = Array.isArray(eingabe) ? eingabe : [eingabe];
@@ -945,6 +1036,7 @@ function vorherigerClip() {
 }
 
 async function zeigeClip() {
+  clearTimeout(bildTimer);
   const datei = wiedergabe.liste[wiedergabe.index];
   if (!datei) return;
 
@@ -974,6 +1066,11 @@ async function zeigeClip() {
     } else {
       anzeige = document.createElement('img');
       anzeige.className = 'voll';
+      // Bilder haben keine Länge – sie bleiben eine feste Zeit stehen,
+      // damit eine Folge aus Videos und Fotos gleichmäßig durchläuft.
+      if (wiedergabe.liste.length > 1) {
+        bildTimer = setTimeout(naechsterClip, CONFIG.BILD_SEKUNDEN * 1000);
+      }
     }
     anzeige.src = url;
     el.overlayIn.appendChild(anzeige);
@@ -1000,14 +1097,15 @@ function leiste(datei, url) {
   l.className = 'leiste';
 
   const gesamt = wiedergabe.liste.length;
-  const rest = tageBisLoeschung(datei.createdTime);
+  const zaehler = gesamt > 1
+    ? 'Clip ' + (wiedergabe.index + 1) + ' von ' + gesamt + ' · ' : '';
 
   const info = document.createElement('span');
   info.className = 'info';
-  info.textContent = (gesamt > 1 ? 'Clip ' + (wiedergabe.index + 1)
-                                   + ' von ' + gesamt + ' · ' : '')
-                   + datei.ordner + ' · ' + mb(datei.size)
-                   + ' MB · noch ' + rest + ' Tage';
+  info.textContent = datei.vorschau
+    ? zaehler + escape_(datei.name) + ' · ' + mb(datei.size) + ' MB · noch nicht hochgeladen'
+    : zaehler + datei.ordner + ' · ' + mb(datei.size)
+      + ' MB · noch ' + tageBisLoeschung(datei.createdTime) + ' Tage';
   l.appendChild(info);
 
   if (gesamt > 1) {
@@ -1026,15 +1124,17 @@ function leiste(datei, url) {
     l.appendChild(weiter);
   }
 
-  const laden = document.createElement('button');
-  laden.textContent = 'Herunterladen';
-  laden.onclick = function () {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = datei.name;
-    a.click();
-  };
-  l.appendChild(laden);
+  if (!datei.vorschau) {
+    const laden = document.createElement('button');
+    laden.textContent = 'Herunterladen';
+    laden.onclick = function () {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = datei.name;
+      a.click();
+    };
+    l.appendChild(laden);
+  }
 
   const zu = document.createElement('button');
   zu.textContent = 'Schließen';
@@ -1096,9 +1196,141 @@ async function blobUrl(datei, fortschritt) {
 
 el.waehlen.onclick = function () { el.datei.click(); };
 
-el.datei.onchange = async function () {
-  const auswahl = Array.prototype.slice.call(el.datei.files);
-  if (!auswahl.length) return;
+/**
+ * Ausgewählte Dateien landen erst in dieser Liste. Dort lässt sich
+ * die Reihenfolge ändern, einzelne entfernen und das Ganze vorab
+ * ansehen. Hochgeladen wird erst auf Knopfdruck.
+ */
+let entwurf = [];
+
+el.datei.onchange = function () {
+  Array.prototype.slice.call(el.datei.files).forEach(function (datei) {
+    entwurf.push({
+      datei: datei,
+      url: URL.createObjectURL(datei),
+      name: datei.name,
+      mimeType: datei.type || 'application/octet-stream',
+      size: datei.size
+    });
+  });
+  el.datei.value = '';
+  zeichneEntwurf();
+};
+
+function zeichneEntwurf() {
+  el.composer.hidden = entwurf.length === 0;
+  if (!entwurf.length) return;
+
+  el.cTitel.textContent = entwurf.length
+    + (entwurf.length === 1 ? ' Datei bereit' : ' Dateien bereit');
+
+  el.cListe.innerHTML = '';
+
+  entwurf.forEach(function (eintrag, i) {
+    const li = document.createElement('li');
+    li.className = 'eintrag';
+
+    const nr = document.createElement('span');
+    nr.className = 'nr';
+    nr.textContent = (i + 1) + '.';
+    li.appendChild(nr);
+
+    const mini = document.createElement('div');
+    mini.className = 'mini';
+    if (eintrag.mimeType.indexOf('video/') === 0) {
+      // Ein stummes Video zeigt seinen ersten Frame – das ist
+      // billiger als selbst ein Vorschaubild zu berechnen.
+      const v = document.createElement('video');
+      v.src = eintrag.url + '#t=0.1';
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = 'metadata';
+      mini.appendChild(v);
+    } else {
+      const img = document.createElement('img');
+      img.src = eintrag.url;
+      img.alt = '';
+      mini.appendChild(img);
+    }
+    li.appendChild(mini);
+
+    const text = document.createElement('div');
+    text.className = 'beschriftung';
+    text.innerHTML = '<div class="dateiname">' + escape_(eintrag.name) + '</div>'
+      + '<div class="klein">' + mb(eintrag.size) + ' MB · '
+      + (eintrag.mimeType.indexOf('video/') === 0
+          ? 'Video' : 'Bild, ' + CONFIG.BILD_SEKUNDEN + ' Sek.')
+      + '</div>';
+    li.appendChild(text);
+
+    const knoepfe = document.createElement('div');
+    knoepfe.className = 'knoepfe';
+
+    const hoch = document.createElement('button');
+    hoch.textContent = '↑';
+    hoch.title = 'nach vorne';
+    hoch.disabled = i === 0;
+    hoch.onclick = function () { tausche(i, i - 1); };
+    knoepfe.appendChild(hoch);
+
+    const runter = document.createElement('button');
+    runter.textContent = '↓';
+    runter.title = 'nach hinten';
+    runter.disabled = i === entwurf.length - 1;
+    runter.onclick = function () { tausche(i, i + 1); };
+    knoepfe.appendChild(runter);
+
+    const weg = document.createElement('button');
+    weg.textContent = '✕';
+    weg.title = 'entfernen';
+    weg.onclick = function () { entferne(i); };
+    knoepfe.appendChild(weg);
+
+    li.appendChild(knoepfe);
+    el.cListe.appendChild(li);
+  });
+}
+
+function tausche(a, b) {
+  const merk = entwurf[a];
+  entwurf[a] = entwurf[b];
+  entwurf[b] = merk;
+  zeichneEntwurf();
+}
+
+function entferne(i) {
+  URL.revokeObjectURL(entwurf[i].url);
+  entwurf.splice(i, 1);
+  zeichneEntwurf();
+}
+
+function leereEntwurf() {
+  entwurf.forEach(function (e) { URL.revokeObjectURL(e.url); });
+  entwurf = [];
+  zeichneEntwurf();
+}
+
+document.getElementById('mehr').onclick = function () { el.datei.click(); };
+document.getElementById('verwerfen').onclick = leereEntwurf;
+
+/** Spielt den Entwurf ab, ohne dass etwas hochgeladen wurde. */
+document.getElementById('vorschau').onclick = function () {
+  if (!entwurf.length) return;
+  oeffneOverlay(entwurf.map(function (e) {
+    return {
+      name: e.name,
+      mimeType: e.mimeType,
+      size: e.size,
+      ordner: 'Vorschau',
+      createdTime: new Date().toISOString(),
+      vorschau: true,
+      _url: e.url          // schon vorhanden, blobUrl lädt nichts nach
+    };
+  }), 0);
+};
+
+document.getElementById('absenden').onclick = async function () {
+  if (!entwurf.length) return;
 
   const ordnerId = el.person.value;
   if (!ordnerId) {
@@ -1116,16 +1348,17 @@ el.datei.onchange = async function () {
   try {
     // Nacheinander, nicht gleichzeitig – sonst konkurrieren die
     // Uploads um dieselbe Leitung und alle werden langsamer.
-    for (let i = 0; i < auswahl.length; i++) {
-      const nummer = auswahl.length > 1
-        ? ' (' + (i + 1) + ' von ' + auswahl.length + ')' : '';
+    for (let i = 0; i < entwurf.length; i++) {
+      const nummer = entwurf.length > 1
+        ? ' (' + (i + 1) + ' von ' + entwurf.length + ')' : '';
 
-      await hochladen(auswahl[i], ordnerId, function (prozent) {
+      await hochladen(entwurf[i].datei, ordnerId, function (prozent) {
         setzeBalken(prozent);
         el.hlStatus.textContent = 'lädt hoch' + nummer + ' … ' + prozent + ' %';
       }, fuerTag, i);
     }
     el.hlStatus.textContent = 'fertig';
+    leereEntwurf();
     wochenStart = montagVon(new Date());
     await laden();
   } catch (fehler) {
@@ -1134,7 +1367,6 @@ el.datei.onchange = async function () {
   } finally {
     el.waehlen.disabled = false;
     el.balken.hidden = true;
-    el.datei.value = '';
     el.fuer.value = '0';   // beim nächsten Mal wieder "heute"
     merkePerson();
   }
