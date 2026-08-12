@@ -121,6 +121,14 @@
   .karte .info .person { font-weight: 600; }
   .karte .info .meta { color: var(--grau); word-break: break-all; }
   .karte .info .bald { color: #b00; }
+  .karte .ersatz {
+    padding: .75rem .6rem;
+    font-size: .8rem;
+    background: #f7f7f7;
+  }
+  .karte .ersatz p { margin: 0 0 .5rem; color: var(--grau); }
+  .karte .ersatz button { font-size: .75rem; padding: .2rem .5rem; }
+
   .karte .aktionen { padding: 0 .6rem .6rem; }
   .karte .aktionen button { font-size: .75rem; padding: .2rem .5rem; }
 
@@ -567,6 +575,13 @@ async function oeffnen(datei, karte, vorschau) {
       anzeige.controls = true;
       anzeige.autoplay = true;
       anzeige.playsInline = true;
+
+      // Kann dieser Browser das Format nicht (typisch: HEVC aus
+      // einem iPhone, geöffnet in Chrome auf Android), springt
+      // der Drive-Player ein. Google legt beim Hochladen eine
+      // umgewandelte Fassung an, die überall läuft.
+      anzeige.onerror = function () { ersatzPlayer(datei, anzeige); };
+
     } else {
       anzeige = document.createElement('img');
       anzeige.className = 'voll';
@@ -579,6 +594,29 @@ async function oeffnen(datei, karte, vorschau) {
     zeigeFehler(fehler.message);
     delete karte.dataset.offen;
   }
+}
+
+/**
+ * Wird aufgerufen, wenn der Browser das Video nicht abspielen kann.
+ * Bietet Drives eigenen Player an, der eine umgewandelte Fassung
+ * ausliefert – die läuft auch dort, wo HEVC fehlt.
+ */
+function ersatzPlayer(datei, videoElement) {
+  const kasten = document.createElement('div');
+  kasten.className = 'ersatz';
+  kasten.innerHTML =
+      '<p>Dieser Browser kann das Format nicht abspielen.<br>'
+    + 'Meist ein iPhone-Video (HEVC) auf einem Android-Gerät.</p>';
+
+  const knopf = document.createElement('button');
+  knopf.textContent = 'Im Drive-Player öffnen';
+  knopf.onclick = function () {
+    window.open('https://drive.google.com/file/d/' + datei.id + '/view',
+                '_blank', 'noopener');
+  };
+  kasten.appendChild(knopf);
+
+  videoElement.replaceWith(kasten);
 }
 
 async function herunterladen(datei, knopf) {
