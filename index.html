@@ -7,18 +7,19 @@
 
 <!--
   ============================================================
-   VIDEOTAGEBUCH – Ansichtsseite
+   VIDEOTAGEBUCH – Ansehen und Hochladen
   ============================================================
 
    Eine einzige Datei, kein Build, kein npm.
    Läuft auf GitHub Pages.
 
-   Was sie tut: meldet dich mit deinem Projekt-Konto bei Google
-   an, liest den geteilten Drive-Ordner aus und zeigt die Videos
-   der letzten 30 Tage.
+   Ablauf: Anmeldung mit dem eigenen Projekt-Konto bei Google,
+   danach liest und schreibt der Browser direkt mit Drive.
+   Die Seite selbst speichert nichts und kennt kein Passwort.
 
-   Sie kann NICHTS verändern oder löschen – der Zugriff ist
-   ausdrücklich nur lesend (Scope drive.readonly).
+   Hochgeladene Dateien gehören dem angemeldeten Konto – dadurch
+   zählt der Speicher gegen dieses Konto und dessen Apps Script
+   darf sie nach 30 Tagen endgültig löschen.
 
    Einrichtung: siehe README.md
   ============================================================
@@ -32,10 +33,9 @@
   * { box-sizing: border-box; }
   body {
     font-family: system-ui, sans-serif;
-    margin: 0;
+    margin: 0 auto;
     padding: 1rem;
     max-width: 900px;
-    margin: 0 auto;
     line-height: 1.5;
   }
   header {
@@ -45,11 +45,11 @@
     flex-wrap: wrap;
     border-bottom: 1px solid var(--rand);
     padding-bottom: .75rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
   }
   h1 { font-size: 1.25rem; margin: 0; }
-  #konto { color: var(--grau); font-size: .85rem; margin-left: auto; }
-  button {
+
+  button, select {
     font: inherit;
     padding: .4rem .8rem;
     border: 1px solid var(--rand);
@@ -57,7 +57,28 @@
     cursor: pointer;
     border-radius: 4px;
   }
-  button:hover { background: #f5f5f5; }
+  button:hover:not(:disabled) { background: #f5f5f5; }
+  button:disabled { opacity: .5; cursor: default; }
+
+  #hochladen-bereich {
+    border: 1px solid var(--rand);
+    border-radius: 4px;
+    padding: .75rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+  }
+  #hochladen-bereich label { font-size: .85rem; color: var(--grau); }
+  #balken {
+    flex-basis: 100%;
+    height: 6px;
+    background: #eee;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  #balken > div { height: 100%; width: 0; background: #333; transition: width .2s; }
 
   .tag { margin-bottom: 2rem; }
   .tag > h2 {
@@ -84,6 +105,8 @@
     justify-content: center;
     cursor: pointer;
     position: relative;
+    font-size: .8rem;
+    color: var(--grau);
   }
   .karte .vorschau img { width: 100%; height: 100%; object-fit: cover; }
   .karte .vorschau .play {
@@ -96,7 +119,7 @@
   .karte video, .karte img.voll { width: 100%; display: block; }
   .karte .info { padding: .5rem .6rem; font-size: .8rem; }
   .karte .info .person { font-weight: 600; }
-  .karte .info .meta { color: var(--grau); }
+  .karte .info .meta { color: var(--grau); word-break: break-all; }
   .karte .info .bald { color: #b00; }
   .karte .aktionen { padding: 0 .6rem .6rem; }
   .karte .aktionen button { font-size: .75rem; padding: .2rem .5rem; }
@@ -120,8 +143,16 @@
   <h1>Videotagebuch</h1>
   <button id="anmelden">Mit Google anmelden</button>
   <button id="neuladen" hidden>Neu laden</button>
-  <span id="konto"></span>
 </header>
+
+<div id="hochladen-bereich" hidden>
+  <label for="person">Ich bin</label>
+  <select id="person"></select>
+  <button id="waehlen">Video auswählen</button>
+  <input type="file" id="datei" accept="video/*,image/*" hidden>
+  <span id="hochladen-status"></span>
+  <div id="balken" hidden><div></div></div>
+</div>
 
 <div id="fehler" hidden></div>
 <p id="status">Nicht angemeldet.</p>
@@ -133,14 +164,19 @@
 
 const CONFIG = {
 
-  // Aus der Google Cloud Console, siehe README Schritt 3.
-  // Sieht aus wie: 1234567890-abc...xyz.apps.googleusercontent.com
   CLIENT_ID: '162999381232-kmusrtl8hsnp8ilr8dg71pb7q9udobnm.apps.googleusercontent.com',
 
   // Der Hauptordner "Videotagebuch"
   ORDNER_ID: '1quX3ETKLsfNxEIsOpiOXHOgrcbtJnsBb',
 
-  AUFBEWAHRUNG_TAGE: 30
+  AUFBEWAHRUNG_TAGE: 30,
+
+  // Vollzugriff auf Drive. Klingt nach viel, ist hier aber das
+  // Richtige: Der eingeschränkte Bereich drive.file darf nur
+  // Dateien anfassen, die die App selbst angelegt hat – dann
+  // sähe niemand die Videos der anderen. Die Projekt-Konten
+  // enthalten ohnehin nichts außer diesem Ordner.
+  BEREICH: 'https://www.googleapis.com/auth/drive'
 };
 
 
@@ -148,14 +184,20 @@ const CONFIG = {
 
 let token = null;
 let tokenClient = null;
+let unterordner = [];
 
 const el = {
-  anmelden: document.getElementById('anmelden'),
-  neuladen: document.getElementById('neuladen'),
-  konto:    document.getElementById('konto'),
-  status:   document.getElementById('status'),
-  fehler:   document.getElementById('fehler'),
-  inhalt:   document.getElementById('inhalt')
+  anmelden:  document.getElementById('anmelden'),
+  neuladen:  document.getElementById('neuladen'),
+  status:    document.getElementById('status'),
+  fehler:    document.getElementById('fehler'),
+  inhalt:    document.getElementById('inhalt'),
+  bereich:   document.getElementById('hochladen-bereich'),
+  person:    document.getElementById('person'),
+  waehlen:   document.getElementById('waehlen'),
+  datei:     document.getElementById('datei'),
+  hlStatus:  document.getElementById('hochladen-status'),
+  balken:    document.getElementById('balken')
 };
 
 
@@ -163,8 +205,7 @@ const el = {
 
 window.onload = function () {
   if (CONFIG.CLIENT_ID.indexOf('apps.googleusercontent.com') === -1) {
-    zeigeFehler('Es ist noch keine CLIENT_ID eingetragen.\n'
-              + 'Siehe README.md, Schritt 3.');
+    zeigeFehler('Es ist noch keine CLIENT_ID eingetragen. Siehe README.md.');
     el.anmelden.disabled = true;
     return;
   }
@@ -175,7 +216,7 @@ window.onload = function () {
 
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CONFIG.CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      scope: CONFIG.BEREICH,
       callback: function (antwort) {
         if (antwort.error) {
           zeigeFehler('Anmeldung fehlgeschlagen: ' + antwort.error);
@@ -184,6 +225,7 @@ window.onload = function () {
         token = antwort.access_token;
         el.anmelden.hidden = true;
         el.neuladen.hidden = false;
+        el.bereich.hidden = false;
         laden();
       }
     });
@@ -194,7 +236,7 @@ el.anmelden.onclick = function () { tokenClient.requestAccessToken(); };
 el.neuladen.onclick = function () { laden(); };
 
 
-// ============ DRIVE ============
+// ============ DRIVE LESEN ============
 
 async function drive(pfad, params) {
   const url = new URL('https://www.googleapis.com/drive/v3/' + pfad);
@@ -209,7 +251,7 @@ async function drive(pfad, params) {
   if (antwort.status === 401) {
     token = null;
     tokenClient.requestAccessToken({ prompt: '' });
-    throw new Error('Sitzung abgelaufen, bitte neu anmelden.');
+    throw new Error('Sitzung abgelaufen. Bitte noch einmal anmelden.');
   }
   if (!antwort.ok) {
     throw new Error('Drive antwortete mit ' + antwort.status + ':\n'
@@ -218,20 +260,21 @@ async function drive(pfad, params) {
   return antwort.json();
 }
 
-/** Alle Dateien aus dem Hauptordner und allen Unterordnern. */
-async function alleDateien() {
-  const unterordner = await drive('files', {
+async function ordnerHolen() {
+  const antwort = await drive('files', {
     q: "'" + CONFIG.ORDNER_ID + "' in parents"
        + " and mimeType='application/vnd.google-apps.folder'"
        + " and trashed=false",
     fields: 'files(id,name)',
+    orderBy: 'name',
     pageSize: 100
   });
+  return antwort.files;
+}
 
-  // Der Hauptordner selbst zählt mit, falls jemand direkt dort ablegt
+async function alleDateien() {
   const quellen = [{ id: CONFIG.ORDNER_ID, name: '(Hauptordner)' }]
-                    .concat(unterordner.files);
-
+                    .concat(unterordner);
   const ergebnis = [];
 
   for (const ordner of quellen) {
@@ -239,18 +282,130 @@ async function alleDateien() {
       q: "'" + ordner.id + "' in parents"
          + " and mimeType!='application/vnd.google-apps.folder'"
          + " and trashed=false",
-      fields: 'files(id,name,mimeType,createdTime,size,thumbnailLink,owners(displayName,emailAddress))',
+      fields: 'files(id,name,mimeType,createdTime,size,thumbnailLink)',
       orderBy: 'createdTime desc',
       pageSize: 200
     });
-
     inhalt.files.forEach(function (datei) {
       datei.ordner = ordner.name;
       ergebnis.push(datei);
     });
   }
-
   return ergebnis;
+}
+
+
+// ============ HOCHLADEN ============
+
+el.waehlen.onclick = function () { el.datei.click(); };
+
+el.datei.onchange = async function () {
+  const datei = el.datei.files[0];
+  if (!datei) return;
+
+  const ordnerId = el.person.value;
+  if (!ordnerId) {
+    zeigeFehler('Bitte zuerst auswählen, wer du bist.');
+    return;
+  }
+
+  el.fehler.hidden = true;
+  el.waehlen.disabled = true;
+  el.balken.hidden = false;
+  setzeBalken(0);
+  el.hlStatus.textContent = 'lädt hoch …';
+
+  try {
+    await hochladen(datei, ordnerId, function (prozent) {
+      setzeBalken(prozent);
+      el.hlStatus.textContent = 'lädt hoch … ' + prozent + ' %';
+    });
+    el.hlStatus.textContent = 'fertig';
+    await laden();
+  } catch (fehler) {
+    el.hlStatus.textContent = '';
+    zeigeFehler(fehler.message);
+  } finally {
+    el.waehlen.disabled = false;
+    el.balken.hidden = true;
+    el.datei.value = '';
+    merkePerson();
+  }
+};
+
+function setzeBalken(prozent) {
+  el.balken.firstElementChild.style.width = prozent + '%';
+}
+
+/**
+ * Wiederaufnehmbarer Upload: Erst wird eine Upload-Adresse
+ * angefordert, dann geht die Datei direkt vom Browser zu Google.
+ * XMLHttpRequest statt fetch, weil nur das einen Fortschritt meldet.
+ */
+async function hochladen(datei, ordnerId, fortschritt) {
+  const name = heute() + '_' + datei.name;
+
+  const start = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': datei.type || 'application/octet-stream',
+        'X-Upload-Content-Length': datei.size
+      },
+      body: JSON.stringify({ name: name, parents: [ordnerId] })
+    }
+  );
+
+  if (!start.ok) {
+    throw new Error('Upload konnte nicht gestartet werden ('
+                    + start.status + '):\n' + (await start.text()));
+  }
+
+  const sitzung = start.headers.get('Location');
+  if (!sitzung) {
+    throw new Error('Google hat keine Upload-Adresse zurückgegeben.');
+  }
+
+  return new Promise(function (fertig, fehlgeschlagen) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', sitzung);
+    xhr.setRequestHeader('Content-Type', datei.type || 'application/octet-stream');
+
+    xhr.upload.onprogress = function (e) {
+      if (e.lengthComputable) {
+        fortschritt(Math.round(e.loaded / e.total * 100));
+      }
+    };
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        fertig(JSON.parse(xhr.responseText || '{}'));
+      } else {
+        fehlgeschlagen(new Error('Upload fehlgeschlagen ('
+                       + xhr.status + '):\n' + xhr.responseText));
+      }
+    };
+    xhr.onerror = function () {
+      fehlgeschlagen(new Error('Netzwerkfehler beim Hochladen.'));
+    };
+    xhr.send(datei);
+  });
+}
+
+function heute() {
+  const d = new Date();
+  return d.getFullYear() + '-'
+       + String(d.getMonth() + 1).padStart(2, '0') + '-'
+       + String(d.getDate()).padStart(2, '0');
+}
+
+function merkePerson() {
+  try { localStorage.setItem('videotagebuch.person', el.person.value); } catch (e) {}
+}
+function gemerktePerson() {
+  try { return localStorage.getItem('videotagebuch.person'); } catch (e) { return null; }
 }
 
 
@@ -263,21 +418,17 @@ async function laden() {
   el.inhalt.innerHTML = '';
 
   try {
-    const dateien = await alleDateien();
+    unterordner = await ordnerHolen();
+    fuellePersonen();
 
-    // Wer bin ich?
-    if (dateien.length && dateien[0].owners) {
-      el.konto.textContent = '';
-    }
+    const dateien = await alleDateien();
 
     if (!dateien.length) {
       el.status.textContent = 'Noch nichts da.';
       return;
     }
-
     el.status.hidden = true;
 
-    // nach Tag gruppieren
     const tage = {};
     dateien.forEach(function (d) {
       const schluessel = new Date(d.createdTime).toLocaleDateString('de-DE');
@@ -296,6 +447,30 @@ async function laden() {
   }
 }
 
+function fuellePersonen() {
+  const vorher = el.person.value || gemerktePerson();
+  el.person.innerHTML = '';
+
+  if (!unterordner.length) {
+    const leer = document.createElement('option');
+    leer.textContent = '(kein Unterordner gefunden)';
+    leer.value = '';
+    el.person.appendChild(leer);
+    return;
+  }
+
+  unterordner.forEach(function (o) {
+    const option = document.createElement('option');
+    option.value = o.id;
+    option.textContent = o.name;
+    el.person.appendChild(option);
+  });
+
+  if (vorher) el.person.value = vorher;
+}
+
+el.person.onchange = merkePerson;
+
 function datum(deutsch) {
   const t = deutsch.split('.');
   return new Date(t[2], t[1] - 1, t[0]).getTime();
@@ -307,8 +482,8 @@ function tagBlock(tag, dateien) {
 
   const rest = tageBisLoeschung(dateien[0].createdTime);
   const kopf = document.createElement('h2');
-  kopf.innerHTML = tag + ' <span>· ' + dateien.length + ' Video'
-                 + (dateien.length > 1 ? 's' : '')
+  kopf.innerHTML = tag + ' <span>· ' + dateien.length + ' Datei'
+                 + (dateien.length > 1 ? 'en' : '')
                  + ' · noch ' + rest + ' Tage</span>';
   block.appendChild(kopf);
 
@@ -339,7 +514,10 @@ function karte(datei) {
     bild.referrerPolicy = 'no-referrer';
     bild.alt = '';
     vorschau.appendChild(bild);
+  } else {
+    vorschau.textContent = 'wird noch verarbeitet';
   }
+
   if (datei.mimeType.indexOf('video/') === 0) {
     const play = document.createElement('div');
     play.className = 'play';
@@ -354,10 +532,8 @@ function karte(datei) {
   info.className = 'info';
   info.innerHTML =
       '<div class="person">' + escape_(datei.ordner) + '</div>'
-    + '<div class="meta">' + escape_(datei.name) + ' · '
-    + mb(datei.size) + ' MB</div>'
-    + '<div class="' + (rest <= 3 ? 'bald' : 'meta') + '">noch '
-    + rest + ' Tage</div>';
+    + '<div class="meta">' + escape_(datei.name) + ' · ' + mb(datei.size) + ' MB</div>'
+    + '<div class="' + (rest <= 3 ? 'bald' : 'meta') + '">noch ' + rest + ' Tage</div>';
   k.appendChild(info);
 
   const aktionen = document.createElement('div');
@@ -371,7 +547,6 @@ function karte(datei) {
   return k;
 }
 
-/** Datei laden und im Browser abspielen bzw. anzeigen. */
 async function oeffnen(datei, karte, vorschau) {
   if (karte.dataset.offen) return;
   karte.dataset.offen = '1';
@@ -383,7 +558,7 @@ async function oeffnen(datei, karte, vorschau) {
 
   try {
     const url = await blobUrl(datei, function (prozent) {
-      platzhalter.textContent = 'lädt … ' + prozent + '%';
+      platzhalter.textContent = 'lädt … ' + prozent + ' %';
     });
 
     let anzeige;
@@ -409,11 +584,8 @@ async function oeffnen(datei, karte, vorschau) {
 async function herunterladen(datei, knopf) {
   const beschriftung = knopf.textContent;
   knopf.disabled = true;
-
   try {
-    const url = await blobUrl(datei, function (p) {
-      knopf.textContent = p + ' %';
-    });
+    const url = await blobUrl(datei, function (p) { knopf.textContent = p + ' %'; });
     const a = document.createElement('a');
     a.href = url;
     a.download = datei.name;
@@ -427,7 +599,6 @@ async function herunterladen(datei, knopf) {
   }
 }
 
-/** Lädt die Datei mit Fortschrittsanzeige und gibt eine lokale URL zurück. */
 async function blobUrl(datei, fortschritt) {
   if (datei._url) return datei._url;
 
@@ -445,18 +616,16 @@ async function blobUrl(datei, fortschritt) {
   let geladen = 0;
 
   while (true) {
-    const { done, value } = await leser.read();
-    if (done) break;
-    teile.push(value);
-    geladen += value.length;
+    const stueck = await leser.read();
+    if (stueck.done) break;
+    teile.push(stueck.value);
+    geladen += stueck.value.length;
     if (gesamt && fortschritt) {
       fortschritt(Math.round(geladen / gesamt * 100));
     }
   }
 
-  datei._url = URL.createObjectURL(
-    new Blob(teile, { type: datei.mimeType })
-  );
+  datei._url = URL.createObjectURL(new Blob(teile, { type: datei.mimeType }));
   return datei._url;
 }
 
