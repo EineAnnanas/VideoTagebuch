@@ -201,6 +201,61 @@
   #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .9rem; }
   #overlay .ersatz p { color: var(--grau); }
 
+  /* ---- Listenansicht (schmale Bildschirme) ----
+     Ein Tag pro Zeile, heute oben, nach unten in die Vergangenheit. */
+  #liste { display: flex; flex-direction: column; gap: .5rem; }
+
+  .zeile {
+    display: flex;
+    gap: .75rem;
+    align-items: stretch;
+    border: 1px solid var(--rand);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .zeile.heute { border-color: #333; }
+  .zeile.pause { border-style: dotted; background: var(--hell); }
+  .zeile.fehlt { border-style: dashed; background: var(--hell); }
+
+  .zeile .miniatur {
+    width: 84px;
+    flex: 0 0 84px;
+    background: #eee;
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .7rem;
+    color: var(--grau);
+    text-align: center;
+  }
+  .zeile.pause .miniatur, .zeile.fehlt .miniatur {
+    background: transparent;
+    cursor: default;
+  }
+  .zeile .miniatur img { width: 100%; height: 100%; object-fit: cover; }
+  .zeile .miniatur .play {
+    position: absolute;
+    font-size: 1.3rem;
+    color: #fff;
+    text-shadow: 0 0 8px rgba(0,0,0,.8);
+    pointer-events: none;
+  }
+  .zeile .text {
+    padding: .6rem .7rem;
+    min-height: 84px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: .1rem;
+  }
+  .zeile .datum { font-size: .78rem; color: var(--grau); }
+  .zeile .wer { font-weight: 600; }
+  .zeile .rest { font-size: .75rem; color: var(--grau); }
+  .zeile .rest.bald { color: #b00; }
+
   /* ---- Handy-Vorschau ----
      Verengt die Seite auf typische Handybreite (390 px). Weil das
      Layout ohnehin mit der verfügbaren Breite arbeitet, sieht man
@@ -261,6 +316,7 @@
 </nav>
 
 <div id="woche" hidden></div>
+<div id="liste" hidden></div>
 
 <div id="overlay" hidden><div id="overlay-inhalt"></div></div>
 
@@ -327,6 +383,7 @@ const el = {
   titel:     document.getElementById('wochentitel'),
   dran:      document.getElementById('dran'),
   woche:     document.getElementById('woche'),
+  liste:     document.getElementById('liste'),
   overlay:   document.getElementById('overlay'),
   overlayIn: document.getElementById('overlay-inhalt')
 };
@@ -433,6 +490,7 @@ function setzeHandy(an) {
   document.body.classList.toggle('handy', an);
   handyKnopf.textContent = an ? 'Volle Breite' : 'Handy-Ansicht';
   try { localStorage.setItem('videotagebuch.handy', an ? '1' : '0'); } catch (e) {}
+  if (dateien.length || token) zeichne();
 }
 
 try {
@@ -507,9 +565,7 @@ async function laden() {
     dateien = await dateienHolen();
 
     el.status.hidden = true;
-    el.leiste.hidden = false;
-    el.woche.hidden = false;
-    zeichneWoche();
+    zeichne();
 
   } catch (fehler) {
     el.status.hidden = true;
@@ -522,16 +578,49 @@ async function laden() {
 
 document.getElementById('zurueck').onclick = function () {
   wochenStart = plusTage(wochenStart, -7);
-  zeichneWoche();
+  zeichne();
 };
 document.getElementById('vor').onclick = function () {
   wochenStart = plusTage(wochenStart, 7);
-  zeichneWoche();
+  zeichne();
 };
 document.getElementById('diesewoche').onclick = function () {
   wochenStart = montagVon(new Date());
-  zeichneWoche();
+  zeichne();
 };
+
+/**
+ * Schmale Bildschirme bekommen die Zeitleiste, breite das
+ * Wochenraster. Sieben Spalten nebeneinander funktionieren auf
+ * einem Telefon nicht.
+ */
+function istSchmal() {
+  return document.body.classList.contains('handy')
+      || window.innerWidth < 700;
+}
+
+function zeichne() {
+  if (!dateien) return;
+
+  if (istSchmal()) {
+    el.leiste.hidden = true;
+    el.woche.hidden = true;
+    el.liste.hidden = false;
+    zeichneListe();
+  } else {
+    el.leiste.hidden = false;
+    el.woche.hidden = false;
+    el.liste.hidden = true;
+    zeichneWoche();
+  }
+}
+
+// Beim Größenändern des Fensters umschalten, aber nicht bei jedem Pixel
+let umschaltTimer = null;
+window.addEventListener('resize', function () {
+  clearTimeout(umschaltTimer);
+  umschaltTimer = setTimeout(zeichne, 150);
+});
 
 function zeichneWoche() {
   const ende = plusTage(wochenStart, 6);
@@ -610,6 +699,103 @@ function tagSpalte(tag, heuteSchluessel) {
 
   return spalte;
 }
+
+// ============ LISTENANSICHT ============
+
+/**
+ * Ein Tag pro Zeile, beginnend mit heute, dann rückwärts bis zum
+ * Ende der Aufbewahrung. Ältere Tage gibt es nicht mehr, die hat
+ * das Apps Script gelöscht.
+ */
+function zeichneListe() {
+  el.liste.innerHTML = '';
+  zeigeWerDran();
+
+  const heuteSchluessel = schluessel(new Date());
+
+  for (let i = 0; i < CONFIG.AUFBEWAHRUNG_TAGE; i++) {
+    const tag = plusTage(new Date(), -i);
+    el.liste.appendChild(tagZeile(tag, heuteSchluessel));
+  }
+}
+
+function tagZeile(tag, heuteSchluessel) {
+  const s = schluessel(tag);
+  const dran = werIstDran(tag);
+  const zeile = document.createElement('div');
+  zeile.className = 'zeile';
+  if (s === heuteSchluessel) zeile.classList.add('heute');
+
+  const datumText = WOCHENTAGE[(tag.getDay() + 6) % 7] + ' '
+                  + tag.getDate() + '.' + (tag.getMonth() + 1) + '.'
+                  + (s === heuteSchluessel ? ' · heute' : '');
+
+  if (dran === null) {
+    zeile.classList.add('pause');
+    zeile.innerHTML =
+        '<div class="miniatur">Pause</div>'
+      + '<div class="text"><div class="datum">' + datumText + '</div>'
+      + '<div class="wer">Pausentag</div></div>';
+    return zeile;
+  }
+
+  const ordner = ordnerFuer(dran);
+  const treffer = ordner
+    ? dateien.filter(function (d) {
+        return d.tagSchluessel === s && d.ordner === ordner.name;
+      })
+    : [];
+  const datei = treffer[0];
+
+  const miniatur = document.createElement('div');
+  miniatur.className = 'miniatur';
+
+  if (datei) {
+    if (datei.thumbnailLink) {
+      const img = document.createElement('img');
+      img.src = datei.thumbnailLink.replace(/=s\d+$/, '=s200');
+      img.referrerPolicy = 'no-referrer';
+      img.alt = '';
+      miniatur.appendChild(img);
+    } else {
+      miniatur.textContent = 'wird verarbeitet';
+    }
+    if (datei.mimeType.indexOf('video/') === 0) {
+      const play = document.createElement('div');
+      play.className = 'play';
+      play.textContent = '▶';
+      miniatur.appendChild(play);
+    }
+    miniatur.onclick = function () { oeffneOverlay(datei); };
+  } else {
+    zeile.classList.add('fehlt');
+    miniatur.textContent = ordner ? '–' : 'kein Ordner';
+  }
+
+  zeile.appendChild(miniatur);
+
+  const text = document.createElement('div');
+  text.className = 'text';
+  text.innerHTML = '<div class="datum">' + datumText + '</div>'
+                 + '<div class="wer">' + escape_(dran) + '</div>';
+
+  if (datei) {
+    const rest = tageBisLoeschung(datei.createdTime);
+    const zeit = document.createElement('div');
+    zeit.className = 'rest' + (rest <= 3 ? ' bald' : '');
+    zeit.textContent = mb(datei.size) + ' MB · noch ' + rest + ' Tage';
+    text.appendChild(zeit);
+  } else {
+    const hinweis = document.createElement('div');
+    hinweis.className = 'rest';
+    hinweis.textContent = tag > new Date() ? 'steht noch aus' : 'kein Video';
+    text.appendChild(hinweis);
+  }
+
+  zeile.appendChild(text);
+  return zeile;
+}
+
 
 function pausenSlot() {
   const slot = document.createElement('div');
