@@ -201,6 +201,23 @@
   #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .9rem; }
   #overlay .ersatz p { color: var(--grau); }
 
+  /* ---- Handy-Vorschau ----
+     Verengt die Seite auf typische Handybreite (390 px). Weil das
+     Layout ohnehin mit der verfügbaren Breite arbeitet, sieht man
+     dadurch am Laptop dasselbe wie auf dem Telefon. */
+  body.handy {
+    max-width: 390px;
+    border: 1px solid #333;
+    border-radius: 22px;
+    padding: 1rem .75rem;
+    margin: 1.5rem auto;
+  }
+  body.handy header { gap: .5rem; }
+  body.handy h1 { font-size: 1.1rem; }
+  body.handy #hochladen-bereich { padding: .5rem; gap: .5rem; }
+  body.handy #dran { margin-left: 0; flex-basis: 100%; }
+  body.handy #wochenleiste { flex-wrap: wrap; }
+
   #status { color: var(--grau); }
   #fehler {
     color: #b00;
@@ -220,6 +237,7 @@
   <h1>Videotagebuch</h1>
   <button id="anmelden">Mit Google anmelden</button>
   <button id="neuladen" hidden>Neu laden</button>
+  <button id="handyknopf" title="Layout in Handybreite ansehen">Handy-Ansicht</button>
 </header>
 
 <div id="hochladen-bereich" hidden>
@@ -401,6 +419,25 @@ window.onload = function () {
 
 el.anmelden.onclick = function () { tokenClient.requestAccessToken(); };
 el.neuladen.onclick = function () { laden(); };
+
+
+// ============ HANDY-VORSCHAU ============
+
+const handyKnopf = document.getElementById('handyknopf');
+
+handyKnopf.onclick = function () {
+  setzeHandy(!document.body.classList.contains('handy'));
+};
+
+function setzeHandy(an) {
+  document.body.classList.toggle('handy', an);
+  handyKnopf.textContent = an ? 'Volle Breite' : 'Handy-Ansicht';
+  try { localStorage.setItem('videotagebuch.handy', an ? '1' : '0'); } catch (e) {}
+}
+
+try {
+  if (localStorage.getItem('videotagebuch.handy') === '1') setzeHandy(true);
+} catch (e) {}
 
 
 // ============ DRIVE LESEN ============
