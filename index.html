@@ -147,6 +147,17 @@
     text-shadow: 0 0 8px rgba(0,0,0,.8);
     pointer-events: none;
   }
+  .slot .anzahl {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    background: rgba(0,0,0,.7);
+    color: #fff;
+    font-size: .65rem;
+    padding: 1px 5px;
+    border-radius: 3px;
+    pointer-events: none;
+  }
   .slot .name {
     font-size: .72rem;
     padding: .3rem .4rem;
@@ -298,8 +309,14 @@
 <div id="hochladen-bereich" hidden>
   <label for="person">Ich bin</label>
   <select id="person"></select>
-  <button id="waehlen">Video auswählen</button>
-  <input type="file" id="datei" accept="video/*,image/*" hidden>
+  <label for="fuer">für</label>
+  <select id="fuer">
+    <option value="0">heute</option>
+    <option value="1">gestern</option>
+    <option value="2">vorgestern</option>
+  </select>
+  <button id="waehlen">Videos auswählen</button>
+  <input type="file" id="datei" accept="video/*,image/*" multiple hidden>
   <span id="hochladen-status"></span>
   <div id="balken" hidden><div></div></div>
 </div>
@@ -375,6 +392,7 @@ const el = {
   fehler:    document.getElementById('fehler'),
   bereich:   document.getElementById('hochladen-bereich'),
   person:    document.getElementById('person'),
+  fuer:      document.getElementById('fuer'),
   waehlen:   document.getElementById('waehlen'),
   datei:     document.getElementById('datei'),
   hlStatus:  document.getElementById('hochladen-status'),
@@ -440,6 +458,21 @@ function ordnerFuer(name) {
   return unterordner.find(function (o) {
     return o.name.toLowerCase().indexOf(gesucht) !== -1;
   }) || null;
+}
+
+
+/**
+ * Zu welchem Tag gehört eine Datei?
+ *
+ * Normalerweise der Upload-Zeitpunkt. Wer aber etwas nachreicht,
+ * lädt es mit einem vorangestellten Datum hoch – dann zählt das,
+ * damit das Video am richtigen Tag erscheint und nicht am Tag des
+ * Nachreichens. Für das Löschen bleibt der echte Upload-Zeitpunkt
+ * maßgeblich; das entscheidet das Apps Script.
+ */
+function tagAus(datei) {
+  const treffer = /^(\d{4}-\d{2}-\d{2})_/.exec(datei.name || '');
+  return treffer ? treffer[1] : schluessel(datei.createdTime);
 }
 
 
@@ -544,7 +577,7 @@ async function dateienHolen() {
     });
     inhalt.files.forEach(function (datei) {
       datei.ordner = ordner.name;
-      datei.tagSchluessel = schluessel(datei.createdTime);
+      datei.tagSchluessel = tagAus(datei);
       ergebnis.push(datei);
     });
   }
@@ -682,8 +715,12 @@ function tagSpalte(tag, heuteSchluessel) {
       })
     : [];
 
+  treffer.sort(nachName);
+
   if (treffer.length) {
-    treffer.forEach(function (d) { spalte.appendChild(vollerSlot(d, dran)); });
+    // Alle Clips eines Tages bilden einen Platz und werden
+    // nacheinander abgespielt.
+    spalte.appendChild(vollerSlot(treffer[0], dran, false, treffer));
   } else {
     spalte.appendChild(leererSlot(dran, !ordner));
   }
@@ -745,6 +782,7 @@ function tagZeile(tag, heuteSchluessel) {
         return d.tagSchluessel === s && d.ordner === ordner.name;
       })
     : [];
+  treffer.sort(nachName);
   const datei = treffer[0];
 
   const miniatur = document.createElement('div');
@@ -766,7 +804,7 @@ function tagZeile(tag, heuteSchluessel) {
       play.textContent = '▶';
       miniatur.appendChild(play);
     }
-    miniatur.onclick = function () { oeffneOverlay(datei); };
+    miniatur.onclick = function () { oeffneOverlay(treffer, 0); };
   } else {
     zeile.classList.add('fehlt');
     miniatur.textContent = ordner ? '–' : 'kein Ordner';
@@ -783,7 +821,11 @@ function tagZeile(tag, heuteSchluessel) {
     const rest = tageBisLoeschung(datei.createdTime);
     const zeit = document.createElement('div');
     zeit.className = 'rest' + (rest <= 3 ? ' bald' : '');
-    zeit.textContent = mb(datei.size) + ' MB · noch ' + rest + ' Tage';
+    const gesamtMb = treffer.reduce(function (summe, d) {
+      return summe + (Number(d.size) || 0);
+    }, 0);
+    zeit.textContent = (treffer.length > 1 ? treffer.length + ' Clips · ' : '')
+                     + mb(gesamtMb) + ' MB · noch ' + rest + ' Tage';
     text.appendChild(zeit);
   } else {
     const hinweis = document.createElement('div');
@@ -804,7 +846,13 @@ function pausenSlot() {
   return slot;
 }
 
-function vollerSlot(datei, name, ausserDerReihe) {
+/** Sortiert nach Dateiname – der beginnt mit Datum und Uhrzeit. */
+function nachName(a, b) {
+  return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+}
+
+function vollerSlot(datei, name, ausserDerReihe, gruppe) {
+  const liste = gruppe || [datei];
   const slot = document.createElement('div');
   slot.className = 'slot voll' + (ausserDerReihe ? ' zusatz' : '');
 
@@ -828,7 +876,14 @@ function vollerSlot(datei, name, ausserDerReihe) {
     bild.appendChild(play);
   }
 
-  bild.onclick = function () { oeffneOverlay(datei); };
+  if (liste.length > 1) {
+    const zaehler = document.createElement('div');
+    zaehler.className = 'anzahl';
+    zaehler.textContent = liste.length + ' Clips';
+    bild.appendChild(zaehler);
+  }
+
+  bild.onclick = function () { oeffneOverlay(liste, 0); };
   slot.appendChild(bild);
 
   const beschriftung = document.createElement('div');
@@ -863,8 +918,36 @@ function schliesseOverlay() {
   el.overlayIn.innerHTML = '';
 }
 
-async function oeffneOverlay(datei) {
+/**
+ * Spielt eine ganze Tagesfolge ab: Ist ein Clip zu Ende, läuft der
+ * nächste automatisch weiter. Der jeweils folgende wird schon
+ * während des laufenden geladen, damit der Übergang nicht hakt.
+ */
+let wiedergabe = { liste: [], index: 0 };
+
+function oeffneOverlay(eingabe, start) {
+  wiedergabe.liste = Array.isArray(eingabe) ? eingabe : [eingabe];
+  wiedergabe.index = start || 0;
   el.overlay.hidden = false;
+  zeigeClip();
+}
+
+function naechsterClip() {
+  if (wiedergabe.index + 1 >= wiedergabe.liste.length) return;
+  wiedergabe.index++;
+  zeigeClip();
+}
+
+function vorherigerClip() {
+  if (wiedergabe.index === 0) return;
+  wiedergabe.index--;
+  zeigeClip();
+}
+
+async function zeigeClip() {
+  const datei = wiedergabe.liste[wiedergabe.index];
+  if (!datei) return;
+
   el.overlayIn.innerHTML = '<div class="ladeanzeige">lädt …</div>';
   const ladeanzeige = el.overlayIn.firstElementChild;
 
@@ -872,6 +955,9 @@ async function oeffneOverlay(datei) {
     const url = await blobUrl(datei, function (p) {
       ladeanzeige.textContent = 'lädt … ' + p + ' %';
     });
+
+    // Ist der Nutzer inzwischen weitergesprungen, nichts mehr tun
+    if (wiedergabe.liste[wiedergabe.index] !== datei) return;
 
     el.overlayIn.innerHTML = '';
 
@@ -881,6 +967,7 @@ async function oeffneOverlay(datei) {
       anzeige.controls = true;
       anzeige.autoplay = true;
       anzeige.playsInline = true;
+      anzeige.onended = naechsterClip;
       // Kann der Browser das Format nicht (typisch: HEVC vom iPhone
       // auf einem Android-Gerät), übernimmt Drives eigener Player.
       anzeige.onerror = function () { ersatzPlayer(datei, anzeige); };
@@ -890,8 +977,9 @@ async function oeffneOverlay(datei) {
     }
     anzeige.src = url;
     el.overlayIn.appendChild(anzeige);
-
     el.overlayIn.appendChild(leiste(datei, url));
+
+    vorladen();
 
   } catch (fehler) {
     el.overlayIn.innerHTML = '<div class="ersatz"><p>'
@@ -899,16 +987,44 @@ async function oeffneOverlay(datei) {
   }
 }
 
+/** Holt den nächsten Clip still im Hintergrund. */
+function vorladen() {
+  const naechste = wiedergabe.liste[wiedergabe.index + 1];
+  if (naechste && !naechste._url) {
+    blobUrl(naechste).catch(function () {});
+  }
+}
+
 function leiste(datei, url) {
   const l = document.createElement('div');
   l.className = 'leiste';
 
+  const gesamt = wiedergabe.liste.length;
   const rest = tageBisLoeschung(datei.createdTime);
+
   const info = document.createElement('span');
   info.className = 'info';
-  info.textContent = datei.ordner + ' · ' + datei.name + ' · '
-                   + mb(datei.size) + ' MB · noch ' + rest + ' Tage';
+  info.textContent = (gesamt > 1 ? 'Clip ' + (wiedergabe.index + 1)
+                                   + ' von ' + gesamt + ' · ' : '')
+                   + datei.ordner + ' · ' + mb(datei.size)
+                   + ' MB · noch ' + rest + ' Tage';
   l.appendChild(info);
+
+  if (gesamt > 1) {
+    const zurueck = document.createElement('button');
+    zurueck.textContent = '‹';
+    zurueck.title = 'vorheriger Clip';
+    zurueck.disabled = wiedergabe.index === 0;
+    zurueck.onclick = vorherigerClip;
+    l.appendChild(zurueck);
+
+    const weiter = document.createElement('button');
+    weiter.textContent = '›';
+    weiter.title = 'nächster Clip';
+    weiter.disabled = wiedergabe.index + 1 >= gesamt;
+    weiter.onclick = naechsterClip;
+    l.appendChild(weiter);
+  }
 
   const laden = document.createElement('button');
   laden.textContent = 'Herunterladen';
@@ -981,8 +1097,8 @@ async function blobUrl(datei, fortschritt) {
 el.waehlen.onclick = function () { el.datei.click(); };
 
 el.datei.onchange = async function () {
-  const datei = el.datei.files[0];
-  if (!datei) return;
+  const auswahl = Array.prototype.slice.call(el.datei.files);
+  if (!auswahl.length) return;
 
   const ordnerId = el.person.value;
   if (!ordnerId) {
@@ -994,13 +1110,21 @@ el.datei.onchange = async function () {
   el.waehlen.disabled = true;
   el.balken.hidden = false;
   setzeBalken(0);
-  el.hlStatus.textContent = 'lädt hoch …';
+
+  const fuerTag = plusTage(new Date(), -Number(el.fuer.value || 0));
 
   try {
-    await hochladen(datei, ordnerId, function (prozent) {
-      setzeBalken(prozent);
-      el.hlStatus.textContent = 'lädt hoch … ' + prozent + ' %';
-    });
+    // Nacheinander, nicht gleichzeitig – sonst konkurrieren die
+    // Uploads um dieselbe Leitung und alle werden langsamer.
+    for (let i = 0; i < auswahl.length; i++) {
+      const nummer = auswahl.length > 1
+        ? ' (' + (i + 1) + ' von ' + auswahl.length + ')' : '';
+
+      await hochladen(auswahl[i], ordnerId, function (prozent) {
+        setzeBalken(prozent);
+        el.hlStatus.textContent = 'lädt hoch' + nummer + ' … ' + prozent + ' %';
+      }, fuerTag, i);
+    }
     el.hlStatus.textContent = 'fertig';
     wochenStart = montagVon(new Date());
     await laden();
@@ -1011,19 +1135,33 @@ el.datei.onchange = async function () {
     el.waehlen.disabled = false;
     el.balken.hidden = true;
     el.datei.value = '';
+    el.fuer.value = '0';   // beim nächsten Mal wieder "heute"
     merkePerson();
   }
 };
 
 function setzeBalken(p) { el.balken.firstElementChild.style.width = p + '%'; }
 
+/** HHMMSS plus laufende Nummer, damit die Sortierung eindeutig bleibt. */
+function uhrzeitMarke(lfdNr) {
+  const d = new Date();
+  return String(d.getHours()).padStart(2, '0')
+       + String(d.getMinutes()).padStart(2, '0')
+       + String(d.getSeconds()).padStart(2, '0')
+       + String(lfdNr || 0).padStart(2, '0');
+}
+
 /**
  * Wiederaufnehmbarer Upload: erst eine Upload-Adresse anfordern,
  * dann geht die Datei direkt vom Browser zu Google. XMLHttpRequest
  * statt fetch, weil nur das einen Fortschritt meldet.
  */
-async function hochladen(datei, ordnerId, fortschritt) {
-  const name = schluessel(new Date()) + '_' + datei.name;
+async function hochladen(datei, ordnerId, fortschritt, fuerTag, lfdNr) {
+  // Datum vorn für die Zuordnung zum Tag, danach eine Uhrzeit,
+  // damit mehrere Clips eines Tages in der Reihenfolge bleiben,
+  // in der sie aufgenommen wurden.
+  const name = schluessel(fuerTag || new Date()) + '_'
+             + uhrzeitMarke(lfdNr) + '_' + datei.name;
 
   const start = await fetch(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
