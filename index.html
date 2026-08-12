@@ -7,19 +7,17 @@
 
 <!--
   ============================================================
-   VIDEOTAGEBUCH – Ansehen und Hochladen
+   VIDEOTAGEBUCH – Wochenansicht
   ============================================================
 
-   Eine einzige Datei, kein Build, kein npm.
-   Läuft auf GitHub Pages.
+   Eine einzige Datei, kein Build, kein npm. Läuft auf GitHub Pages.
 
-   Ablauf: Anmeldung mit dem eigenen Projekt-Konto bei Google,
-   danach liest und schreibt der Browser direkt mit Drive.
-   Die Seite selbst speichert nichts und kennt kein Passwort.
+   Aufbau: sieben Tagesspalten nebeneinander, darin pro Person
+   ein Platz. Belegt = Vorschaubild, anklickbar. Frei = gestrichelter
+   Rahmen. Damit sieht man auf einen Blick, wer wann gefehlt hat.
 
-   Hochgeladene Dateien gehören dem angemeldeten Konto – dadurch
-   zählt der Speicher gegen dieses Konto und dessen Apps Script
-   darf sie nach 30 Tagen endgültig löschen.
+   Anmeldung mit dem eigenen Projekt-Konto, danach spricht der
+   Browser direkt mit Drive. Die Seite speichert nichts.
 
    Einrichtung: siehe README.md
   ============================================================
@@ -29,15 +27,17 @@
   :root {
     --rand: #ddd;
     --grau: #666;
+    --hell: #f7f7f7;
   }
   * { box-sizing: border-box; }
   body {
     font-family: system-ui, sans-serif;
     margin: 0 auto;
     padding: 1rem;
-    max-width: 900px;
+    max-width: 1100px;
     line-height: 1.5;
   }
+
   header {
     display: flex;
     align-items: baseline;
@@ -57,80 +57,141 @@
     cursor: pointer;
     border-radius: 4px;
   }
-  button:hover:not(:disabled) { background: #f5f5f5; }
+  button:hover:not(:disabled) { background: var(--hell); }
   button:disabled { opacity: .5; cursor: default; }
 
+  /* ---- Hochladen ---- */
   #hochladen-bereich {
     border: 1px solid var(--rand);
     border-radius: 4px;
     padding: .75rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
     display: flex;
     align-items: center;
     gap: .75rem;
     flex-wrap: wrap;
   }
   #hochladen-bereich label { font-size: .85rem; color: var(--grau); }
-  #balken {
-    flex-basis: 100%;
-    height: 6px;
-    background: #eee;
-    border-radius: 3px;
-    overflow: hidden;
-  }
+  #balken { flex-basis: 100%; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
   #balken > div { height: 100%; width: 0; background: #333; transition: width .2s; }
 
-  .tag { margin-bottom: 2rem; }
-  .tag > h2 {
-    font-size: .95rem;
-    font-weight: 600;
-    margin: 0 0 .6rem;
-    padding-bottom: .3rem;
-    border-bottom: 1px solid var(--rand);
+  /* ---- Wochenleiste ---- */
+  #wochenleiste {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .75rem;
   }
-  .tag > h2 span { font-weight: 400; color: var(--grau); }
+  #wochentitel { font-weight: 600; margin: 0 .5rem; }
+  #wochenleiste .pfeil { padding: .3rem .7rem; }
 
-  .raster {
+  /* ---- Wochenraster ---- */
+  #woche {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: .75rem;
+    grid-template-columns: repeat(7, minmax(130px, 1fr));
+    gap: .5rem;
+    overflow-x: auto;
+    padding-bottom: .5rem;
   }
-  .karte { border: 1px solid var(--rand); border-radius: 4px; overflow: hidden; }
-  .karte .vorschau {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    background: #f0f0f0;
+
+  .tagspalte { min-width: 130px; }
+  .tagkopf {
+    border-bottom: 2px solid var(--rand);
+    padding-bottom: .3rem;
+    margin-bottom: .5rem;
+    font-size: .85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .tagkopf .wochentag { font-weight: 600; }
+  .tagkopf .datum { color: var(--grau); }
+  .tagspalte.heute .tagkopf { border-bottom-color: #333; }
+  .tagspalte.zukunft { opacity: .45; }
+
+  .slot {
+    border: 1px solid var(--rand);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: .5rem;
+    background: #fff;
+  }
+  .slot.leer {
+    border-style: dashed;
+    background: var(--hell);
+  }
+  .slot .bild {
+    aspect-ratio: 3 / 4;
+    background: #eee;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
     position: relative;
-    font-size: .8rem;
+    cursor: pointer;
+    font-size: .7rem;
     color: var(--grau);
+    text-align: center;
+    padding: .25rem;
   }
-  .karte .vorschau img { width: 100%; height: 100%; object-fit: cover; }
-  .karte .vorschau .play {
+  .slot.leer .bild {
+    background: transparent;
+    cursor: default;
+    aspect-ratio: 3 / 4;
+  }
+  .slot .bild img { width: 100%; height: 100%; object-fit: cover; }
+  .slot .bild .play {
     position: absolute;
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     color: #fff;
-    text-shadow: 0 0 8px rgba(0,0,0,.7);
+    text-shadow: 0 0 8px rgba(0,0,0,.8);
     pointer-events: none;
   }
-  .karte video, .karte img.voll { width: 100%; display: block; }
-  .karte .info { padding: .5rem .6rem; font-size: .8rem; }
-  .karte .info .person { font-weight: 600; }
-  .karte .info .meta { color: var(--grau); word-break: break-all; }
-  .karte .info .bald { color: #b00; }
-  .karte .ersatz {
-    padding: .75rem .6rem;
-    font-size: .8rem;
-    background: #f7f7f7;
+  .slot .name {
+    font-size: .72rem;
+    padding: .3rem .4rem;
+    border-top: 1px solid var(--rand);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .karte .ersatz p { margin: 0 0 .5rem; color: var(--grau); }
-  .karte .ersatz button { font-size: .75rem; padding: .2rem .5rem; }
+  .slot.leer .name { border-top: 0; color: var(--grau); }
 
-  .karte .aktionen { padding: 0 .6rem .6rem; }
-  .karte .aktionen button { font-size: .75rem; padding: .2rem .5rem; }
+  /* ---- Overlay ---- */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 10;
+  }
+  #overlay-inhalt {
+    background: #fff;
+    border-radius: 4px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 100%;
+    overflow: auto;
+  }
+  #overlay video, #overlay img.voll { width: 100%; display: block; background: #000; }
+  #overlay .leiste {
+    padding: .6rem .8rem;
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: .85rem;
+  }
+  #overlay .leiste .info { color: var(--grau); margin-right: auto; }
+  #overlay .ladeanzeige {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--grau);
+  }
+  #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .9rem; }
+  #overlay .ersatz p { color: var(--grau); }
 
   #status { color: var(--grau); }
   #fehler {
@@ -164,7 +225,17 @@
 
 <div id="fehler" hidden></div>
 <p id="status">Nicht angemeldet.</p>
-<main id="inhalt"></main>
+
+<nav id="wochenleiste" hidden>
+  <button class="pfeil" id="zurueck" title="Woche zurück">‹</button>
+  <button class="pfeil" id="vor" title="Woche vor">›</button>
+  <span id="wochentitel"></span>
+  <button id="diesewoche">Diese Woche</button>
+</nav>
+
+<div id="woche" hidden></div>
+
+<div id="overlay" hidden><div id="overlay-inhalt"></div></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
@@ -179,34 +250,68 @@ const CONFIG = {
 
   AUFBEWAHRUNG_TAGE: 30,
 
-  // Vollzugriff auf Drive. Klingt nach viel, ist hier aber das
-  // Richtige: Der eingeschränkte Bereich drive.file darf nur
-  // Dateien anfassen, die die App selbst angelegt hat – dann
-  // sähe niemand die Videos der anderen. Die Projekt-Konten
-  // enthalten ohnehin nichts außer diesem Ordner.
+  // Vollzugriff auf Drive. Der eingeschränkte Bereich drive.file
+  // dürfte nur Dateien anfassen, die die App selbst angelegt hat –
+  // dann sähe niemand die Videos der anderen.
   BEREICH: 'https://www.googleapis.com/auth/drive'
 };
+
+const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli',
+                'August','September','Oktober','November','Dezember'];
 
 
 // ============ ZUSTAND ============
 
 let token = null;
 let tokenClient = null;
-let unterordner = [];
+let unterordner = [];      // [{id, name}]
+let dateien = [];          // alle Dateien mit .ordner und .tagSchluessel
+let wochenStart = montagVon(new Date());
 
 const el = {
   anmelden:  document.getElementById('anmelden'),
   neuladen:  document.getElementById('neuladen'),
   status:    document.getElementById('status'),
   fehler:    document.getElementById('fehler'),
-  inhalt:    document.getElementById('inhalt'),
   bereich:   document.getElementById('hochladen-bereich'),
   person:    document.getElementById('person'),
   waehlen:   document.getElementById('waehlen'),
   datei:     document.getElementById('datei'),
   hlStatus:  document.getElementById('hochladen-status'),
-  balken:    document.getElementById('balken')
+  balken:    document.getElementById('balken'),
+  leiste:    document.getElementById('wochenleiste'),
+  titel:     document.getElementById('wochentitel'),
+  woche:     document.getElementById('woche'),
+  overlay:   document.getElementById('overlay'),
+  overlayIn: document.getElementById('overlay-inhalt')
 };
+
+
+// ============ DATUM ============
+
+/** Montag der Woche, in der d liegt. */
+function montagVon(d) {
+  const x = new Date(d);
+  const versatz = (x.getDay() + 6) % 7;   // So=0 → 6
+  x.setDate(x.getDate() - versatz);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/** 2026-08-10 – als Schlüssel zum Gruppieren, in lokaler Zeit. */
+function schluessel(d) {
+  const x = new Date(d);
+  return x.getFullYear() + '-'
+       + String(x.getMonth() + 1).padStart(2, '0') + '-'
+       + String(x.getDate()).padStart(2, '0');
+}
+
+function plusTage(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
 
 
 // ============ ANMELDUNG ============
@@ -252,9 +357,7 @@ async function drive(pfad, params) {
     url.searchParams.set(k, params[k]);
   });
 
-  const antwort = await fetch(url, {
-    headers: { Authorization: 'Bearer ' + token }
-  });
+  const antwort = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
 
   if (antwort.status === 401) {
     token = null;
@@ -262,8 +365,7 @@ async function drive(pfad, params) {
     throw new Error('Sitzung abgelaufen. Bitte noch einmal anmelden.');
   }
   if (!antwort.ok) {
-    throw new Error('Drive antwortete mit ' + antwort.status + ':\n'
-                    + (await antwort.text()));
+    throw new Error('Drive antwortete mit ' + antwort.status + ':\n' + (await antwort.text()));
   }
   return antwort.json();
 }
@@ -271,8 +373,7 @@ async function drive(pfad, params) {
 async function ordnerHolen() {
   const antwort = await drive('files', {
     q: "'" + CONFIG.ORDNER_ID + "' in parents"
-       + " and mimeType='application/vnd.google-apps.folder'"
-       + " and trashed=false",
+       + " and mimeType='application/vnd.google-apps.folder' and trashed=false",
     fields: 'files(id,name)',
     orderBy: 'name',
     pageSize: 100
@@ -280,26 +381,292 @@ async function ordnerHolen() {
   return antwort.files;
 }
 
-async function alleDateien() {
-  const quellen = [{ id: CONFIG.ORDNER_ID, name: '(Hauptordner)' }]
-                    .concat(unterordner);
+async function dateienHolen() {
+  const quellen = [{ id: CONFIG.ORDNER_ID, name: '(Hauptordner)' }].concat(unterordner);
   const ergebnis = [];
 
   for (const ordner of quellen) {
     const inhalt = await drive('files', {
       q: "'" + ordner.id + "' in parents"
-         + " and mimeType!='application/vnd.google-apps.folder'"
-         + " and trashed=false",
+         + " and mimeType!='application/vnd.google-apps.folder' and trashed=false",
       fields: 'files(id,name,mimeType,createdTime,size,thumbnailLink)',
       orderBy: 'createdTime desc',
       pageSize: 200
     });
     inhalt.files.forEach(function (datei) {
       datei.ordner = ordner.name;
+      datei.tagSchluessel = schluessel(datei.createdTime);
       ergebnis.push(datei);
     });
   }
   return ergebnis;
+}
+
+
+// ============ LADEN ============
+
+async function laden() {
+  el.fehler.hidden = true;
+  el.status.hidden = false;
+  el.status.textContent = 'Lade …';
+
+  try {
+    unterordner = await ordnerHolen();
+    fuellePersonen();
+    dateien = await dateienHolen();
+
+    el.status.hidden = true;
+    el.leiste.hidden = false;
+    el.woche.hidden = false;
+    zeichneWoche();
+
+  } catch (fehler) {
+    el.status.hidden = true;
+    zeigeFehler(fehler.message);
+  }
+}
+
+
+// ============ WOCHENANSICHT ============
+
+document.getElementById('zurueck').onclick = function () {
+  wochenStart = plusTage(wochenStart, -7);
+  zeichneWoche();
+};
+document.getElementById('vor').onclick = function () {
+  wochenStart = plusTage(wochenStart, 7);
+  zeichneWoche();
+};
+document.getElementById('diesewoche').onclick = function () {
+  wochenStart = montagVon(new Date());
+  zeichneWoche();
+};
+
+function zeichneWoche() {
+  const ende = plusTage(wochenStart, 6);
+  el.titel.textContent = titelText(wochenStart, ende);
+
+  el.woche.innerHTML = '';
+  const heuteSchluessel = schluessel(new Date());
+
+  for (let i = 0; i < 7; i++) {
+    const tag = plusTage(wochenStart, i);
+    el.woche.appendChild(tagSpalte(tag, heuteSchluessel));
+  }
+}
+
+function titelText(von, bis) {
+  if (von.getMonth() === bis.getMonth()) {
+    return von.getDate() + '.–' + bis.getDate() + '. '
+         + MONATE[von.getMonth()] + ' ' + von.getFullYear();
+  }
+  return von.getDate() + '. ' + MONATE[von.getMonth()] + ' – '
+       + bis.getDate() + '. ' + MONATE[bis.getMonth()] + ' ' + bis.getFullYear();
+}
+
+function tagSpalte(tag, heuteSchluessel) {
+  const s = schluessel(tag);
+  const spalte = document.createElement('div');
+  spalte.className = 'tagspalte';
+  if (s === heuteSchluessel) spalte.classList.add('heute');
+  if (tag.getTime() > Date.now()) spalte.classList.add('zukunft');
+
+  const kopf = document.createElement('div');
+  kopf.className = 'tagkopf';
+  kopf.innerHTML =
+      '<span class="wochentag">' + WOCHENTAGE[(tag.getDay() + 6) % 7] + '</span>'
+    + '<span class="datum">' + tag.getDate() + '.' + (tag.getMonth() + 1) + '.</span>';
+  spalte.appendChild(kopf);
+
+  // pro Person ein Platz
+  const personen = unterordner.length
+    ? unterordner.map(function (o) { return o.name; })
+    : ['(Hauptordner)'];
+
+  personen.forEach(function (name) {
+    const treffer = dateien.filter(function (d) {
+      return d.tagSchluessel === s && d.ordner === name;
+    });
+
+    if (treffer.length) {
+      treffer.forEach(function (d) { spalte.appendChild(vollerSlot(d, name)); });
+    } else {
+      spalte.appendChild(leererSlot(name));
+    }
+  });
+
+  return spalte;
+}
+
+function vollerSlot(datei, name) {
+  const slot = document.createElement('div');
+  slot.className = 'slot voll';
+
+  const bild = document.createElement('div');
+  bild.className = 'bild';
+
+  if (datei.thumbnailLink) {
+    const img = document.createElement('img');
+    img.src = datei.thumbnailLink.replace(/=s\d+$/, '=s400');
+    img.referrerPolicy = 'no-referrer';
+    img.alt = '';
+    bild.appendChild(img);
+  } else {
+    bild.textContent = 'wird verarbeitet';
+  }
+
+  if (datei.mimeType.indexOf('video/') === 0) {
+    const play = document.createElement('div');
+    play.className = 'play';
+    play.textContent = '▶';
+    bild.appendChild(play);
+  }
+
+  bild.onclick = function () { oeffneOverlay(datei); };
+  slot.appendChild(bild);
+
+  const beschriftung = document.createElement('div');
+  beschriftung.className = 'name';
+  beschriftung.textContent = name;
+  beschriftung.title = datei.name + ' · ' + mb(datei.size) + ' MB';
+  slot.appendChild(beschriftung);
+
+  return slot;
+}
+
+function leererSlot(name) {
+  const slot = document.createElement('div');
+  slot.className = 'slot leer';
+  slot.innerHTML = '<div class="bild">–</div>'
+                 + '<div class="name">' + escape_(name) + '</div>';
+  return slot;
+}
+
+
+// ============ OVERLAY ============
+
+el.overlay.onclick = function (e) {
+  if (e.target === el.overlay) schliesseOverlay();
+};
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') schliesseOverlay();
+});
+
+function schliesseOverlay() {
+  el.overlay.hidden = true;
+  el.overlayIn.innerHTML = '';
+}
+
+async function oeffneOverlay(datei) {
+  el.overlay.hidden = false;
+  el.overlayIn.innerHTML = '<div class="ladeanzeige">lädt …</div>';
+  const ladeanzeige = el.overlayIn.firstElementChild;
+
+  try {
+    const url = await blobUrl(datei, function (p) {
+      ladeanzeige.textContent = 'lädt … ' + p + ' %';
+    });
+
+    el.overlayIn.innerHTML = '';
+
+    let anzeige;
+    if (datei.mimeType.indexOf('video/') === 0) {
+      anzeige = document.createElement('video');
+      anzeige.controls = true;
+      anzeige.autoplay = true;
+      anzeige.playsInline = true;
+      // Kann der Browser das Format nicht (typisch: HEVC vom iPhone
+      // auf einem Android-Gerät), übernimmt Drives eigener Player.
+      anzeige.onerror = function () { ersatzPlayer(datei, anzeige); };
+    } else {
+      anzeige = document.createElement('img');
+      anzeige.className = 'voll';
+    }
+    anzeige.src = url;
+    el.overlayIn.appendChild(anzeige);
+
+    el.overlayIn.appendChild(leiste(datei, url));
+
+  } catch (fehler) {
+    el.overlayIn.innerHTML = '<div class="ersatz"><p>'
+      + escape_(fehler.message) + '</p></div>';
+  }
+}
+
+function leiste(datei, url) {
+  const l = document.createElement('div');
+  l.className = 'leiste';
+
+  const rest = tageBisLoeschung(datei.createdTime);
+  const info = document.createElement('span');
+  info.className = 'info';
+  info.textContent = datei.ordner + ' · ' + datei.name + ' · '
+                   + mb(datei.size) + ' MB · noch ' + rest + ' Tage';
+  l.appendChild(info);
+
+  const laden = document.createElement('button');
+  laden.textContent = 'Herunterladen';
+  laden.onclick = function () {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = datei.name;
+    a.click();
+  };
+  l.appendChild(laden);
+
+  const zu = document.createElement('button');
+  zu.textContent = 'Schließen';
+  zu.onclick = schliesseOverlay;
+  l.appendChild(zu);
+
+  return l;
+}
+
+function ersatzPlayer(datei, videoElement) {
+  const kasten = document.createElement('div');
+  kasten.className = 'ersatz';
+  kasten.innerHTML = '<p>Dieser Browser kann das Format nicht abspielen.<br>'
+                   + 'Meist ein iPhone-Video (HEVC) auf einem Android-Gerät.</p>';
+
+  const knopf = document.createElement('button');
+  knopf.textContent = 'Im Drive-Player öffnen';
+  knopf.onclick = function () {
+    window.open('https://drive.google.com/file/d/' + datei.id + '/view',
+                '_blank', 'noopener');
+  };
+  kasten.appendChild(knopf);
+  videoElement.replaceWith(kasten);
+}
+
+function tageBisLoeschung(erstellt) {
+  const weg = new Date(erstellt).getTime() + CONFIG.AUFBEWAHRUNG_TAGE * 86400000;
+  return Math.max(0, Math.ceil((weg - Date.now()) / 86400000));
+}
+
+async function blobUrl(datei, fortschritt) {
+  if (datei._url) return datei._url;
+
+  const antwort = await fetch(
+    'https://www.googleapis.com/drive/v3/files/' + datei.id + '?alt=media',
+    { headers: { Authorization: 'Bearer ' + token } }
+  );
+  if (!antwort.ok) throw new Error('Konnte Datei nicht laden (' + antwort.status + ')');
+
+  const gesamt = Number(datei.size || 0);
+  const leser = antwort.body.getReader();
+  const teile = [];
+  let geladen = 0;
+
+  while (true) {
+    const stueck = await leser.read();
+    if (stueck.done) break;
+    teile.push(stueck.value);
+    geladen += stueck.value.length;
+    if (gesamt && fortschritt) fortschritt(Math.round(geladen / gesamt * 100));
+  }
+
+  datei._url = URL.createObjectURL(new Blob(teile, { type: datei.mimeType }));
+  return datei._url;
 }
 
 
@@ -329,6 +696,7 @@ el.datei.onchange = async function () {
       el.hlStatus.textContent = 'lädt hoch … ' + prozent + ' %';
     });
     el.hlStatus.textContent = 'fertig';
+    wochenStart = montagVon(new Date());
     await laden();
   } catch (fehler) {
     el.hlStatus.textContent = '';
@@ -341,17 +709,15 @@ el.datei.onchange = async function () {
   }
 };
 
-function setzeBalken(prozent) {
-  el.balken.firstElementChild.style.width = prozent + '%';
-}
+function setzeBalken(p) { el.balken.firstElementChild.style.width = p + '%'; }
 
 /**
- * Wiederaufnehmbarer Upload: Erst wird eine Upload-Adresse
- * angefordert, dann geht die Datei direkt vom Browser zu Google.
- * XMLHttpRequest statt fetch, weil nur das einen Fortschritt meldet.
+ * Wiederaufnehmbarer Upload: erst eine Upload-Adresse anfordern,
+ * dann geht die Datei direkt vom Browser zu Google. XMLHttpRequest
+ * statt fetch, weil nur das einen Fortschritt meldet.
  */
 async function hochladen(datei, ordnerId, fortschritt) {
-  const name = heute() + '_' + datei.name;
+  const name = schluessel(new Date()) + '_' + datei.name;
 
   const start = await fetch(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
@@ -373,9 +739,7 @@ async function hochladen(datei, ordnerId, fortschritt) {
   }
 
   const sitzung = start.headers.get('Location');
-  if (!sitzung) {
-    throw new Error('Google hat keine Upload-Adresse zurückgegeben.');
-  }
+  if (!sitzung) throw new Error('Google hat keine Upload-Adresse zurückgegeben.');
 
   return new Promise(function (fertig, fehlgeschlagen) {
     const xhr = new XMLHttpRequest();
@@ -383,76 +747,18 @@ async function hochladen(datei, ordnerId, fortschritt) {
     xhr.setRequestHeader('Content-Type', datei.type || 'application/octet-stream');
 
     xhr.upload.onprogress = function (e) {
-      if (e.lengthComputable) {
-        fortschritt(Math.round(e.loaded / e.total * 100));
-      }
+      if (e.lengthComputable) fortschritt(Math.round(e.loaded / e.total * 100));
     };
     xhr.onload = function () {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        fertig(JSON.parse(xhr.responseText || '{}'));
-      } else {
-        fehlgeschlagen(new Error('Upload fehlgeschlagen ('
-                       + xhr.status + '):\n' + xhr.responseText));
-      }
+      if (xhr.status >= 200 && xhr.status < 300) fertig(JSON.parse(xhr.responseText || '{}'));
+      else fehlgeschlagen(new Error('Upload fehlgeschlagen ('
+                          + xhr.status + '):\n' + xhr.responseText));
     };
     xhr.onerror = function () {
       fehlgeschlagen(new Error('Netzwerkfehler beim Hochladen.'));
     };
     xhr.send(datei);
   });
-}
-
-function heute() {
-  const d = new Date();
-  return d.getFullYear() + '-'
-       + String(d.getMonth() + 1).padStart(2, '0') + '-'
-       + String(d.getDate()).padStart(2, '0');
-}
-
-function merkePerson() {
-  try { localStorage.setItem('videotagebuch.person', el.person.value); } catch (e) {}
-}
-function gemerktePerson() {
-  try { return localStorage.getItem('videotagebuch.person'); } catch (e) { return null; }
-}
-
-
-// ============ ANZEIGE ============
-
-async function laden() {
-  el.fehler.hidden = true;
-  el.status.hidden = false;
-  el.status.textContent = 'Lade …';
-  el.inhalt.innerHTML = '';
-
-  try {
-    unterordner = await ordnerHolen();
-    fuellePersonen();
-
-    const dateien = await alleDateien();
-
-    if (!dateien.length) {
-      el.status.textContent = 'Noch nichts da.';
-      return;
-    }
-    el.status.hidden = true;
-
-    const tage = {};
-    dateien.forEach(function (d) {
-      const schluessel = new Date(d.createdTime).toLocaleDateString('de-DE');
-      (tage[schluessel] = tage[schluessel] || []).push(d);
-    });
-
-    Object.keys(tage)
-      .sort(function (a, b) { return datum(b) - datum(a); })
-      .forEach(function (tag) {
-        el.inhalt.appendChild(tagBlock(tag, tage[tag]));
-      });
-
-  } catch (fehler) {
-    el.status.hidden = true;
-    zeigeFehler(fehler.message);
-  }
 }
 
 function fuellePersonen() {
@@ -479,192 +785,11 @@ function fuellePersonen() {
 
 el.person.onchange = merkePerson;
 
-function datum(deutsch) {
-  const t = deutsch.split('.');
-  return new Date(t[2], t[1] - 1, t[0]).getTime();
+function merkePerson() {
+  try { localStorage.setItem('videotagebuch.person', el.person.value); } catch (e) {}
 }
-
-function tagBlock(tag, dateien) {
-  const block = document.createElement('section');
-  block.className = 'tag';
-
-  const rest = tageBisLoeschung(dateien[0].createdTime);
-  const kopf = document.createElement('h2');
-  kopf.innerHTML = tag + ' <span>· ' + dateien.length + ' Datei'
-                 + (dateien.length > 1 ? 'en' : '')
-                 + ' · noch ' + rest + ' Tage</span>';
-  block.appendChild(kopf);
-
-  const raster = document.createElement('div');
-  raster.className = 'raster';
-  dateien.forEach(function (d) { raster.appendChild(karte(d)); });
-  block.appendChild(raster);
-
-  return block;
-}
-
-function tageBisLoeschung(erstellt) {
-  const weg = new Date(erstellt).getTime()
-            + CONFIG.AUFBEWAHRUNG_TAGE * 86400000;
-  return Math.max(0, Math.ceil((weg - Date.now()) / 86400000));
-}
-
-function karte(datei) {
-  const k = document.createElement('div');
-  k.className = 'karte';
-
-  const vorschau = document.createElement('div');
-  vorschau.className = 'vorschau';
-
-  if (datei.thumbnailLink) {
-    const bild = document.createElement('img');
-    bild.src = datei.thumbnailLink.replace(/=s\d+$/, '=s400');
-    bild.referrerPolicy = 'no-referrer';
-    bild.alt = '';
-    vorschau.appendChild(bild);
-  } else {
-    vorschau.textContent = 'wird noch verarbeitet';
-  }
-
-  if (datei.mimeType.indexOf('video/') === 0) {
-    const play = document.createElement('div');
-    play.className = 'play';
-    play.textContent = '▶';
-    vorschau.appendChild(play);
-  }
-  vorschau.onclick = function () { oeffnen(datei, k, vorschau); };
-  k.appendChild(vorschau);
-
-  const rest = tageBisLoeschung(datei.createdTime);
-  const info = document.createElement('div');
-  info.className = 'info';
-  info.innerHTML =
-      '<div class="person">' + escape_(datei.ordner) + '</div>'
-    + '<div class="meta">' + escape_(datei.name) + ' · ' + mb(datei.size) + ' MB</div>'
-    + '<div class="' + (rest <= 3 ? 'bald' : 'meta') + '">noch ' + rest + ' Tage</div>';
-  k.appendChild(info);
-
-  const aktionen = document.createElement('div');
-  aktionen.className = 'aktionen';
-  const knopf = document.createElement('button');
-  knopf.textContent = 'Herunterladen';
-  knopf.onclick = function () { herunterladen(datei, knopf); };
-  aktionen.appendChild(knopf);
-  k.appendChild(aktionen);
-
-  return k;
-}
-
-async function oeffnen(datei, karte, vorschau) {
-  if (karte.dataset.offen) return;
-  karte.dataset.offen = '1';
-
-  const platzhalter = document.createElement('div');
-  platzhalter.className = 'vorschau';
-  platzhalter.textContent = 'lädt …';
-  vorschau.replaceWith(platzhalter);
-
-  try {
-    const url = await blobUrl(datei, function (prozent) {
-      platzhalter.textContent = 'lädt … ' + prozent + ' %';
-    });
-
-    let anzeige;
-    if (datei.mimeType.indexOf('video/') === 0) {
-      anzeige = document.createElement('video');
-      anzeige.controls = true;
-      anzeige.autoplay = true;
-      anzeige.playsInline = true;
-
-      // Kann dieser Browser das Format nicht (typisch: HEVC aus
-      // einem iPhone, geöffnet in Chrome auf Android), springt
-      // der Drive-Player ein. Google legt beim Hochladen eine
-      // umgewandelte Fassung an, die überall läuft.
-      anzeige.onerror = function () { ersatzPlayer(datei, anzeige); };
-
-    } else {
-      anzeige = document.createElement('img');
-      anzeige.className = 'voll';
-    }
-    anzeige.src = url;
-    platzhalter.replaceWith(anzeige);
-
-  } catch (fehler) {
-    platzhalter.textContent = 'Fehler';
-    zeigeFehler(fehler.message);
-    delete karte.dataset.offen;
-  }
-}
-
-/**
- * Wird aufgerufen, wenn der Browser das Video nicht abspielen kann.
- * Bietet Drives eigenen Player an, der eine umgewandelte Fassung
- * ausliefert – die läuft auch dort, wo HEVC fehlt.
- */
-function ersatzPlayer(datei, videoElement) {
-  const kasten = document.createElement('div');
-  kasten.className = 'ersatz';
-  kasten.innerHTML =
-      '<p>Dieser Browser kann das Format nicht abspielen.<br>'
-    + 'Meist ein iPhone-Video (HEVC) auf einem Android-Gerät.</p>';
-
-  const knopf = document.createElement('button');
-  knopf.textContent = 'Im Drive-Player öffnen';
-  knopf.onclick = function () {
-    window.open('https://drive.google.com/file/d/' + datei.id + '/view',
-                '_blank', 'noopener');
-  };
-  kasten.appendChild(knopf);
-
-  videoElement.replaceWith(kasten);
-}
-
-async function herunterladen(datei, knopf) {
-  const beschriftung = knopf.textContent;
-  knopf.disabled = true;
-  try {
-    const url = await blobUrl(datei, function (p) { knopf.textContent = p + ' %'; });
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = datei.name;
-    a.click();
-    knopf.textContent = beschriftung;
-  } catch (fehler) {
-    knopf.textContent = 'Fehler';
-    zeigeFehler(fehler.message);
-  } finally {
-    knopf.disabled = false;
-  }
-}
-
-async function blobUrl(datei, fortschritt) {
-  if (datei._url) return datei._url;
-
-  const antwort = await fetch(
-    'https://www.googleapis.com/drive/v3/files/' + datei.id + '?alt=media',
-    { headers: { Authorization: 'Bearer ' + token } }
-  );
-  if (!antwort.ok) {
-    throw new Error('Konnte Datei nicht laden (' + antwort.status + ')');
-  }
-
-  const gesamt = Number(datei.size || 0);
-  const leser = antwort.body.getReader();
-  const teile = [];
-  let geladen = 0;
-
-  while (true) {
-    const stueck = await leser.read();
-    if (stueck.done) break;
-    teile.push(stueck.value);
-    geladen += stueck.value.length;
-    if (gesamt && fortschritt) {
-      fortschritt(Math.round(geladen / gesamt * 100));
-    }
-  }
-
-  datei._url = URL.createObjectURL(new Blob(teile, { type: datei.mimeType }));
-  return datei._url;
+function gemerktePerson() {
+  try { return localStorage.getItem('videotagebuch.person'); } catch (e) { return null; }
 }
 
 
