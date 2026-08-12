@@ -83,6 +83,7 @@
     margin-bottom: .75rem;
   }
   #wochentitel { font-weight: 600; margin: 0 .5rem; }
+  #dran { margin-left: auto; color: var(--grau); font-size: .85rem; }
   #wochenleiste .pfeil { padding: .3rem .7rem; }
 
   /* ---- Wochenraster ---- */
@@ -155,6 +156,13 @@
     text-overflow: ellipsis;
   }
   .slot.leer .name { border-top: 0; color: var(--grau); }
+
+  .slot.pause { border-style: dotted; background: var(--hell); }
+  .slot.pause .bild { background: transparent; cursor: default; color: var(--grau); }
+  .slot.pause .name { border-top: 0; color: var(--grau); }
+
+  .slot.zusatz { opacity: .7; }
+  .slot.zusatz .name::before { content: 'außer der Reihe: '; color: var(--grau); }
 
   /* ---- Overlay ---- */
   #overlay {
@@ -231,6 +239,7 @@
   <button class="pfeil" id="vor" title="Woche vor">›</button>
   <span id="wochentitel"></span>
   <button id="diesewoche">Diese Woche</button>
+  <span id="dran"></span>
 </nav>
 
 <div id="woche" hidden></div>
@@ -249,6 +258,22 @@ const CONFIG = {
   ORDNER_ID: '1quX3ETKLsfNxEIsOpiOXHOgrcbtJnsBb',
 
   AUFBEWAHRUNG_TAGE: 30,
+
+  // Wer wann dran ist.
+  //
+  // Sieben Namen plus ein Pausentag ergeben einen Zyklus von acht
+  // Tagen. Weil eine Woche nur sieben Tage hat, verschiebt sich die
+  // Zuteilung jede Woche um einen Tag – sonst hätte jeder für immer
+  // denselben Wochentag. Nach acht Wochen war jeder einmal überall.
+  //
+  // null steht für den Pausentag. Reihenfolge einfach umsortieren,
+  // wenn ihr tauschen wollt.
+  REIHENFOLGE: [
+    'fabian', 'lennart', 'joshua', 'dario', 'benni', 'jarno', 'timo', null
+  ],
+
+  // Erster Tag des Zyklus – an diesem Tag ist der erste Name dran.
+  ZYKLUS_START: '2026-08-10',
 
   // Vollzugriff auf Drive. Der eingeschränkte Bereich drive.file
   // dürfte nur Dateien anfassen, die die App selbst angelegt hat –
@@ -282,6 +307,7 @@ const el = {
   balken:    document.getElementById('balken'),
   leiste:    document.getElementById('wochenleiste'),
   titel:     document.getElementById('wochentitel'),
+  dran:      document.getElementById('dran'),
   woche:     document.getElementById('woche'),
   overlay:   document.getElementById('overlay'),
   overlayIn: document.getElementById('overlay-inhalt')
@@ -311,6 +337,34 @@ function plusTage(d, n) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
   return x;
+}
+
+
+// ============ WER IST DRAN ============
+
+/**
+ * Gibt den Namen zurück, der an diesem Tag dran ist –
+ * oder null, wenn Pausentag.
+ */
+function werIstDran(tag) {
+  const start = new Date(CONFIG.ZYKLUS_START + 'T00:00:00');
+  const jetzt = new Date(tag);
+  jetzt.setHours(0, 0, 0, 0);
+
+  const laenge = CONFIG.REIHENFOLGE.length;
+  const abstand = Math.round((jetzt - start) / 86400000);
+  const index = ((abstand % laenge) + laenge) % laenge;
+
+  return CONFIG.REIHENFOLGE[index];
+}
+
+/** Sucht den Drive-Unterordner, der zu einem Namen gehört. */
+function ordnerFuer(name) {
+  if (!name) return null;
+  const gesucht = name.toLowerCase();
+  return unterordner.find(function (o) {
+    return o.name.toLowerCase().indexOf(gesucht) !== -1;
+  }) || null;
 }
 
 
@@ -445,6 +499,7 @@ document.getElementById('diesewoche').onclick = function () {
 function zeichneWoche() {
   const ende = plusTage(wochenStart, 6);
   el.titel.textContent = titelText(wochenStart, ende);
+  zeigeWerDran();
 
   el.woche.innerHTML = '';
   const heuteSchluessel = schluessel(new Date());
@@ -453,6 +508,14 @@ function zeichneWoche() {
     const tag = plusTage(wochenStart, i);
     el.woche.appendChild(tagSpalte(tag, heuteSchluessel));
   }
+}
+
+/** Kleiner Hinweis über dem Raster: wer heute an der Reihe ist. */
+function zeigeWerDran() {
+  const dran = werIstDran(new Date());
+  el.dran.textContent = dran === null
+    ? 'Heute ist Pausentag.'
+    : 'Heute ist ' + dran + ' dran.';
 }
 
 function titelText(von, bis) {
@@ -478,29 +541,49 @@ function tagSpalte(tag, heuteSchluessel) {
     + '<span class="datum">' + tag.getDate() + '.' + (tag.getMonth() + 1) + '.</span>';
   spalte.appendChild(kopf);
 
-  // pro Person ein Platz
-  const personen = unterordner.length
-    ? unterordner.map(function (o) { return o.name; })
-    : ['(Hauptordner)'];
+  const dran = werIstDran(tag);
 
-  personen.forEach(function (name) {
-    const treffer = dateien.filter(function (d) {
-      return d.tagSchluessel === s && d.ordner === name;
-    });
+  if (dran === null) {
+    spalte.appendChild(pausenSlot());
+    return spalte;
+  }
 
-    if (treffer.length) {
-      treffer.forEach(function (d) { spalte.appendChild(vollerSlot(d, name)); });
-    } else {
-      spalte.appendChild(leererSlot(name));
-    }
+  // Videos dieses Tages aus dem Ordner der Person, die dran ist
+  const ordner = ordnerFuer(dran);
+  const treffer = ordner
+    ? dateien.filter(function (d) {
+        return d.tagSchluessel === s && d.ordner === ordner.name;
+      })
+    : [];
+
+  if (treffer.length) {
+    treffer.forEach(function (d) { spalte.appendChild(vollerSlot(d, dran)); });
+  } else {
+    spalte.appendChild(leererSlot(dran, !ordner));
+  }
+
+  // Falls jemand außer der Reihe etwas hochgeladen hat, geht es
+  // nicht verloren – es erscheint darunter als Zusatz.
+  const zusatz = dateien.filter(function (d) {
+    return d.tagSchluessel === s && (!ordner || d.ordner !== ordner.name);
+  });
+  zusatz.forEach(function (d) {
+    spalte.appendChild(vollerSlot(d, d.ordner, true));
   });
 
   return spalte;
 }
 
-function vollerSlot(datei, name) {
+function pausenSlot() {
   const slot = document.createElement('div');
-  slot.className = 'slot voll';
+  slot.className = 'slot pause';
+  slot.innerHTML = '<div class="bild">Pause</div><div class="name">frei</div>';
+  return slot;
+}
+
+function vollerSlot(datei, name, ausserDerReihe) {
+  const slot = document.createElement('div');
+  slot.className = 'slot voll' + (ausserDerReihe ? ' zusatz' : '');
 
   const bild = document.createElement('div');
   bild.className = 'bild';
@@ -534,10 +617,10 @@ function vollerSlot(datei, name) {
   return slot;
 }
 
-function leererSlot(name) {
+function leererSlot(name, ohneOrdner) {
   const slot = document.createElement('div');
   slot.className = 'slot leer';
-  slot.innerHTML = '<div class="bild">–</div>'
+  slot.innerHTML = '<div class="bild">' + (ohneOrdner ? 'kein Ordner' : '–') + '</div>'
                  + '<div class="name">' + escape_(name) + '</div>';
   return slot;
 }
