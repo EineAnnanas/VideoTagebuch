@@ -7,17 +7,17 @@
 
 <!--
   ============================================================
-   VIDEOTAGEBUCH – Wochenansicht
+   VIDEOTAGEBUCH
   ============================================================
 
    Eine einzige Datei, kein Build, kein npm. Läuft auf GitHub Pages.
 
-   Aufbau: sieben Tagesspalten nebeneinander, darin pro Person
-   ein Platz. Belegt = Vorschaubild, anklickbar. Frei = gestrichelter
-   Rahmen. Damit sieht man auf einen Blick, wer wann gefehlt hat.
+   Ansicht: Zeitleiste mit Datumsspalte links, darunter die
+   Belegungsübersicht. Das Wochenraster gibt es als Umschaltung.
 
    Anmeldung mit dem eigenen Projekt-Konto, danach spricht der
-   Browser direkt mit Drive. Die Seite speichert nichts.
+   Browser direkt mit Drive. Die Seite speichert nichts und kennt
+   kein Passwort.
 
    Einrichtung: siehe README.md
   ============================================================
@@ -25,341 +25,304 @@
 
 <style>
   :root {
-    --rand: #ddd;
-    --grau: #666;
-    --hell: #f7f7f7;
+    --papier:  #faf9f5;
+    --flaeche: #fffefb;
+    --rand:    #e3e0d6;
+    --text:    #2c2b26;
+    --grau:    #8a877c;
+    --blass:   #c3bfb1;
+    --platz:   #e6e2d5;
+    --serif:   Georgia, 'Iowan Old Style', 'Times New Roman', serif;
   }
   * { box-sizing: border-box; }
   body {
-    font-family: system-ui, sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--papier);
+    color: var(--text);
     margin: 0 auto;
-    padding: 1rem;
-    max-width: 1100px;
+    padding: 1.25rem 1rem 3rem;
+    max-width: 820px;
     line-height: 1.5;
   }
 
   header {
     display: flex;
     align-items: baseline;
-    gap: 1rem;
+    gap: .6rem;
     flex-wrap: wrap;
     border-bottom: 1px solid var(--rand);
-    padding-bottom: .75rem;
-    margin-bottom: 1rem;
+    padding-bottom: .9rem;
+    margin-bottom: 1.25rem;
   }
-  h1 { font-size: 1.25rem; margin: 0; }
+  h1 {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: normal;
+    margin: 0;
+    margin-right: auto;
+  }
 
   button, select {
     font: inherit;
-    padding: .4rem .8rem;
+    font-size: .85rem;
+    padding: .35rem .7rem;
     border: 1px solid var(--rand);
-    background: #fff;
+    background: var(--flaeche);
+    color: var(--text);
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 3px;
   }
-  button:hover:not(:disabled) { background: var(--hell); }
-  button:disabled { opacity: .5; cursor: default; }
+  button:hover:not(:disabled) { background: #f2f0e8; }
+  button:disabled { opacity: .4; cursor: default; }
 
   /* ---- Hochladen ---- */
   #hochladen-bereich {
     border: 1px solid var(--rand);
     border-radius: 4px;
-    padding: .75rem;
+    background: var(--flaeche);
+    padding: .7rem;
     margin-bottom: 1.25rem;
     display: flex;
     align-items: center;
-    gap: .75rem;
+    gap: .6rem;
     flex-wrap: wrap;
   }
-  #hochladen-bereich label { font-size: .85rem; color: var(--grau); }
-  #balken { flex-basis: 100%; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
-  #balken > div { height: 100%; width: 0; background: #333; transition: width .2s; }
-
-  /* ---- Wochenleiste ---- */
-  #wochenleiste {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    margin-bottom: .75rem;
-  }
-  #wochentitel { font-weight: 600; margin: 0 .5rem; }
-  #dran { margin-left: auto; color: var(--grau); font-size: .85rem; }
-  #wochenleiste .pfeil { padding: .3rem .7rem; }
-
-  /* ---- Wochenraster ---- */
-  #woche {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(130px, 1fr));
-    gap: .5rem;
-    overflow-x: auto;
-    padding-bottom: .5rem;
-  }
-
-  .tagspalte { min-width: 130px; }
-  .tagkopf {
-    border-bottom: 2px solid var(--rand);
-    padding-bottom: .3rem;
-    margin-bottom: .5rem;
-    font-size: .85rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-  }
-  .tagkopf .wochentag { font-weight: 600; }
-  .tagkopf .datum { color: var(--grau); }
-  .tagspalte.heute .tagkopf { border-bottom-color: #333; }
-  .tagspalte.zukunft { opacity: .45; }
-
-  .slot {
-    border: 1px solid var(--rand);
-    border-radius: 4px;
+  #hochladen-bereich label { font-size: .8rem; color: var(--grau); }
+  #hochladen-status { font-size: .8rem; color: var(--grau); }
+  #balken {
+    flex-basis: 100%;
+    height: 4px;
+    background: var(--platz);
+    border-radius: 2px;
     overflow: hidden;
-    margin-bottom: .5rem;
-    background: #fff;
   }
-  .slot.leer {
-    border-style: dashed;
-    background: var(--hell);
-  }
-  .slot .bild {
-    aspect-ratio: 3 / 4;
-    background: #eee;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    cursor: pointer;
-    font-size: .7rem;
-    color: var(--grau);
-    text-align: center;
-    padding: .25rem;
-  }
-  .slot.leer .bild {
-    background: transparent;
-    cursor: default;
-    aspect-ratio: 3 / 4;
-  }
-  .slot .bild img { width: 100%; height: 100%; object-fit: cover; }
-  .slot .bild .play {
-    position: absolute;
-    font-size: 1.4rem;
-    color: #fff;
-    text-shadow: 0 0 8px rgba(0,0,0,.8);
-    pointer-events: none;
-  }
-  .slot .anzahl {
-    position: absolute;
-    right: 4px;
-    bottom: 4px;
-    background: rgba(0,0,0,.7);
-    color: #fff;
-    font-size: .65rem;
-    padding: 1px 5px;
-    border-radius: 3px;
-    pointer-events: none;
-  }
-  .slot .name {
-    font-size: .72rem;
-    padding: .3rem .4rem;
-    border-top: 1px solid var(--rand);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .slot.leer .name { border-top: 0; color: var(--grau); }
-
-  .slot.pause { border-style: dotted; background: var(--hell); }
-  .slot.pause .bild { background: transparent; cursor: default; color: var(--grau); }
-  .slot.pause .name { border-top: 0; color: var(--grau); }
-
-  .slot.zusatz { opacity: .7; }
-  .slot.zusatz .name::before { content: 'außer der Reihe: '; color: var(--grau); }
-
-  /* ---- Overlay ---- */
-  #overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.85);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    z-index: 10;
-  }
-  #overlay-inhalt {
-    background: #fff;
-    border-radius: 4px;
-    max-width: 700px;
-    width: 100%;
-    max-height: 100%;
-    overflow: auto;
-  }
-  #overlay video, #overlay img.voll { width: 100%; display: block; background: #000; }
-  #overlay .leiste {
-    padding: .6rem .8rem;
-    display: flex;
-    gap: .5rem;
-    align-items: center;
-    flex-wrap: wrap;
-    font-size: .85rem;
-  }
-  #overlay .leiste .info { color: var(--grau); margin-right: auto; }
-  #overlay .ladeanzeige {
-    padding: 3rem 1rem;
-    text-align: center;
-    color: var(--grau);
-  }
-  #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .9rem; }
-  #overlay .ersatz p { color: var(--grau); }
+  #balken > div { height: 100%; width: 0; background: var(--text); transition: width .2s; }
 
   /* ---- Zusammenstellen vor dem Hochladen ---- */
   #composer {
-    border: 1px solid #333;
+    border: 1px solid var(--text);
     border-radius: 4px;
-    padding: .75rem;
+    background: var(--flaeche);
+    padding: .8rem;
     margin-bottom: 1.25rem;
   }
-  #composer .kopf { margin-bottom: .6rem; }
-  #composer .hinweis {
-    display: block;
-    font-size: .8rem;
-    color: var(--grau);
-  }
+  #composer-titel { font-family: var(--serif); font-size: 1.05rem; }
+  #composer .hinweis { display: block; font-size: .78rem; color: var(--grau); }
   #composer-liste {
     list-style: none;
-    margin: 0 0 .75rem;
+    margin: .7rem 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: .4rem;
+    gap: .35rem;
   }
   .eintrag {
     display: flex;
     align-items: center;
-    gap: .6rem;
+    gap: .55rem;
     border: 1px solid var(--rand);
-    border-radius: 4px;
-    padding: .4rem;
-    background: #fff;
-  }
-  .eintrag .nr {
-    font-size: .8rem;
-    color: var(--grau);
-    width: 1.2rem;
-    text-align: center;
-    flex: 0 0 auto;
-  }
-  .eintrag .mini {
-    width: 54px;
-    height: 54px;
-    flex: 0 0 54px;
-    background: #eee;
     border-radius: 3px;
-    overflow: hidden;
+    padding: .35rem;
+  }
+  .eintrag .nr { font-size: .78rem; color: var(--grau); width: 1.1rem; text-align: center; flex: 0 0 auto; }
+  .eintrag .mini {
+    width: 50px; height: 50px; flex: 0 0 50px;
+    background: var(--platz); border-radius: 2px; overflow: hidden;
   }
   .eintrag .mini img, .eintrag .mini video {
     width: 100%; height: 100%; object-fit: cover; display: block;
   }
-  .eintrag .beschriftung {
-    flex: 1 1 auto;
-    min-width: 0;
-    font-size: .8rem;
-  }
-  .eintrag .beschriftung .dateiname {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .eintrag .beschriftung .klein { color: var(--grau); font-size: .75rem; }
-  .eintrag .knoepfe { display: flex; gap: .25rem; flex: 0 0 auto; }
-  .eintrag .knoepfe button {
-    padding: .3rem .5rem;
-    min-width: 2rem;
-    line-height: 1;
-  }
-  .composer-aktionen { display: flex; gap: .5rem; flex-wrap: wrap; }
-  #absenden { border-color: #333; font-weight: 600; }
+  .eintrag .beschriftung { flex: 1 1 auto; min-width: 0; font-size: .8rem; }
+  .eintrag .dateiname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eintrag .klein { color: var(--grau); font-size: .73rem; }
+  .eintrag .knoepfe { display: flex; gap: .2rem; flex: 0 0 auto; }
+  .eintrag .knoepfe button { padding: .28rem .45rem; min-width: 1.9rem; line-height: 1; }
+  .composer-aktionen { display: flex; gap: .4rem; flex-wrap: wrap; }
+  #absenden { border-color: var(--text); }
 
-  /* ---- Listenansicht (schmale Bildschirme) ----
-     Ein Tag pro Zeile, heute oben, nach unten in die Vergangenheit. */
-  #liste { display: flex; flex-direction: column; gap: .5rem; }
-
-  .zeile {
+  /* ---- Zeitleiste ---- */
+  .tagzeile {
     display: flex;
-    gap: .75rem;
-    align-items: stretch;
-    border: 1px solid var(--rand);
-    border-radius: 4px;
-    overflow: hidden;
-    background: #fff;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--rand);
   }
-  .zeile.heute { border-color: #333; }
-  .zeile.pause { border-style: dotted; background: var(--hell); }
-  .zeile.fehlt { border-style: dashed; background: var(--hell); }
+  .tagzeile:first-child { border-top: 0; padding-top: .25rem; }
+  .tagzeile.leerlauf .zahl,
+  .tagzeile.leerlauf .monat,
+  .tagzeile.leerlauf .wer { color: var(--blass); }
 
-  .zeile .miniatur {
-    width: 84px;
-    flex: 0 0 84px;
-    background: #eee;
+  .datumspalte { flex: 0 0 74px; text-align: right; }
+  .datumspalte .zahl {
+    font-family: var(--serif);
+    font-size: 1.7rem;
+    line-height: 1.05;
+  }
+  .datumspalte .monat { font-size: .72rem; color: var(--grau); }
+  .datumspalte .heute {
+    display: inline-block;
+    font-size: .68rem;
+    border: 1px solid var(--rand);
+    border-radius: 10px;
+    padding: 0 .4rem;
+    margin-top: .2rem;
+    color: var(--grau);
+  }
+
+  .tagzeile .inhalt { flex: 1 1 auto; min-width: 0; }
+  .tagzeile .wer {
+    font-family: var(--serif);
+    font-size: 1.05rem;
+    margin-bottom: .45rem;
+  }
+  .tagzeile .wer span { font-family: system-ui, sans-serif; font-size: .75rem; color: var(--grau); }
+
+  .clips { display: flex; gap: .35rem; }
+  .kachel {
+    flex: 1 1 0;
+    max-width: 108px;
+    aspect-ratio: 3 / 4;
+    background: var(--platz);
+    border-radius: 3px;
+    overflow: hidden;
     position: relative;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .7rem;
-    color: var(--grau);
-    text-align: center;
   }
-  .zeile.pause .miniatur, .zeile.fehlt .miniatur {
-    background: transparent;
-    cursor: default;
-  }
-  .zeile .miniatur img { width: 100%; height: 100%; object-fit: cover; }
-  .zeile .miniatur .play {
-    position: absolute;
-    font-size: 1.3rem;
-    color: #fff;
-    text-shadow: 0 0 8px rgba(0,0,0,.8);
+  .kachel img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .kachel .play {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1.2rem;
+    text-shadow: 0 0 10px rgba(0,0,0,.8);
     pointer-events: none;
   }
-  .zeile .text {
-    padding: .6rem .7rem;
-    min-height: 84px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: .1rem;
+  .kachel .wartet {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .65rem; color: var(--grau); text-align: center; padding: .2rem;
   }
-  .zeile .datum { font-size: .78rem; color: var(--grau); }
-  .zeile .wer { font-weight: 600; }
-  .zeile .rest { font-size: .75rem; color: var(--grau); }
-  .zeile .rest.bald { color: #b00; }
 
-  /* ---- Handy-Vorschau ----
-     Verengt die Seite auf typische Handybreite (390 px). Weil das
-     Layout ohnehin mit der verfügbaren Breite arbeitet, sieht man
-     dadurch am Laptop dasselbe wie auf dem Telefon. */
+  .keins {
+    border: 1px dashed var(--blass);
+    border-radius: 3px;
+    padding: .8rem;
+    font-size: .8rem;
+    color: var(--blass);
+  }
+  .pausenfeld {
+    border: 1px dotted var(--blass);
+    border-radius: 3px;
+    padding: .8rem;
+    font-size: .8rem;
+    color: var(--grau);
+  }
+
+  .extraknopf {
+    margin-top: .5rem;
+    font-size: .75rem;
+    padding: .25rem .55rem;
+    color: var(--grau);
+  }
+  .extras { margin-top: .5rem; }
+  .extras .wer { font-size: .8rem; font-family: system-ui, sans-serif; color: var(--grau); }
+
+  /* ---- Wochenraster (Umschaltung) ---- */
+  #woche {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(96px, 1fr));
+    gap: .5rem;
+    overflow-x: auto;
+    padding-bottom: .5rem;
+  }
+  .tagspalte .tagkopf {
+    border-bottom: 1px solid var(--rand);
+    padding-bottom: .25rem;
+    margin-bottom: .45rem;
+    font-size: .75rem;
+    display: flex;
+    justify-content: space-between;
+  }
+  .tagspalte.heute .tagkopf { border-bottom-color: var(--text); }
+  .tagspalte.zukunft { opacity: .45; }
+  .tagspalte .wer {
+    font-family: var(--serif);
+    font-size: .85rem;
+    margin-top: .3rem;
+  }
+  .tagspalte .kachel { max-width: none; }
+
+  #wochenleiste { display: flex; align-items: center; gap: .4rem; margin-bottom: .8rem; }
+  #wochentitel { font-family: var(--serif); font-size: 1.05rem; margin: 0 .4rem; }
+  #dran { margin-left: auto; color: var(--grau); font-size: .8rem; }
+
+  /* ---- Belegungsübersicht ---- */
+  #uebersicht {
+    border-top: 1px solid var(--rand);
+    margin-top: 1.75rem;
+    padding-top: 1.1rem;
+  }
+  #zahlen { display: flex; gap: 1.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  #zahlen .kennzahl .titel { font-size: .7rem; color: var(--grau); }
+  #zahlen .kennzahl .wert { font-family: var(--serif); font-size: 1.25rem; }
+
+  #raster { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  #raster td { padding: .18rem 0; }
+  #raster td.person { color: var(--grau); width: 6.5rem; }
+  #raster td.punkt { text-align: center; }
+  #raster .da { color: var(--text); }
+  #raster .fehlt { color: var(--blass); }
+  #raster .legende { font-size: .72rem; color: var(--grau); padding-top: .6rem; }
+
+  /* ---- Overlay ---- */
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(20,19,17,.9);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem; z-index: 10;
+  }
+  #overlay-inhalt {
+    background: var(--flaeche);
+    border-radius: 4px;
+    max-width: 640px; width: 100%; max-height: 100%; overflow: auto;
+  }
+  #overlay video, #overlay img.voll { width: 100%; display: block; background: #000; }
+  #overlay .leiste {
+    padding: .55rem .7rem;
+    display: flex; gap: .4rem; align-items: center; flex-wrap: wrap;
+    font-size: .8rem;
+  }
+  #overlay .leiste .info { color: var(--grau); margin-right: auto; }
+  #overlay .ladeanzeige { padding: 3rem 1rem; text-align: center; color: var(--grau); }
+  #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .85rem; }
+  #overlay .ersatz p { color: var(--grau); }
+
+  /* ---- Handy-Vorschau ---- */
   body.handy {
     max-width: 390px;
-    border: 1px solid #333;
+    border: 1px solid var(--blass);
     border-radius: 22px;
-    padding: 1rem .75rem;
+    padding: 1rem .8rem 2rem;
     margin: 1.5rem auto;
   }
-  body.handy header { gap: .5rem; }
-  body.handy h1 { font-size: 1.1rem; }
-  body.handy #hochladen-bereich { padding: .5rem; gap: .5rem; }
-  body.handy #dran { margin-left: 0; flex-basis: 100%; }
-  body.handy #wochenleiste { flex-wrap: wrap; }
+  body.handy h1 { font-size: 1.25rem; }
+  body.handy .datumspalte { flex: 0 0 52px; }
+  body.handy .datumspalte .zahl { font-size: 1.4rem; }
+
+  @media (max-width: 560px) {
+    .datumspalte { flex: 0 0 52px; }
+    .datumspalte .zahl { font-size: 1.4rem; }
+    .tagzeile { gap: .7rem; }
+  }
 
   #status { color: var(--grau); }
   #fehler {
-    color: #b00;
+    color: #8c2f22;
     white-space: pre-wrap;
-    font-size: .85rem;
-    border: 1px solid #b00;
-    padding: .75rem;
-    border-radius: 4px;
+    font-size: .82rem;
+    border: 1px solid #d8b9b1;
+    background: #fbf3f1;
+    padding: .7rem;
+    border-radius: 3px;
     margin-bottom: 1rem;
   }
   [hidden] { display: none !important; }
@@ -370,8 +333,9 @@
 <header>
   <h1>Videotagebuch</h1>
   <button id="anmelden">Mit Google anmelden</button>
+  <button id="ansicht" hidden>Wochenraster</button>
   <button id="neuladen" hidden>Neu laden</button>
-  <button id="handyknopf" title="Layout in Handybreite ansehen">Handy-Ansicht</button>
+  <button id="handyknopf">Handy-Ansicht</button>
 </header>
 
 <div id="hochladen-bereich" hidden>
@@ -390,7 +354,7 @@
 </div>
 
 <section id="composer" hidden>
-  <div class="kopf">
+  <div>
     <strong id="composer-titel"></strong>
     <span class="hinweis">Reihenfolge festlegen, ansehen, dann abschicken.</span>
   </div>
@@ -407,15 +371,20 @@
 <p id="status">Nicht angemeldet.</p>
 
 <nav id="wochenleiste" hidden>
-  <button class="pfeil" id="zurueck" title="Woche zurück">‹</button>
-  <button class="pfeil" id="vor" title="Woche vor">›</button>
+  <button id="zurueck" title="Woche zurück">‹</button>
+  <button id="vor" title="Woche vor">›</button>
   <span id="wochentitel"></span>
   <button id="diesewoche">Diese Woche</button>
   <span id="dran"></span>
 </nav>
 
+<main id="zeitleiste" hidden></main>
 <div id="woche" hidden></div>
-<div id="liste" hidden></div>
+
+<section id="uebersicht" hidden>
+  <div id="zahlen"></div>
+  <table id="raster"></table>
+</section>
 
 <div id="overlay" hidden><div id="overlay-inhalt"></div></div>
 
@@ -432,9 +401,11 @@ const CONFIG = {
 
   AUFBEWAHRUNG_TAGE: 30,
 
-  // Wie lange ein Bild beim Abspielen stehen bleibt, bevor der
-  // nächste Clip kommt.
+  // Wie lange ein Bild beim Abspielen stehen bleibt.
   BILD_SEKUNDEN: 4,
+
+  // Wie viele Tage die Zeitleiste zeigt.
+  ZEITLEISTE_TAGE: 30,
 
   // Wer wann dran ist.
   //
@@ -443,8 +414,7 @@ const CONFIG = {
   // Zuteilung jede Woche um einen Tag – sonst hätte jeder für immer
   // denselben Wochentag. Nach acht Wochen war jeder einmal überall.
   //
-  // null steht für den Pausentag. Reihenfolge einfach umsortieren,
-  // wenn ihr tauschen wollt.
+  // null steht für den Pausentag.
   REIHENFOLGE: [
     'fabian', 'lennart', 'joshua', 'dario', 'benni', 'jarno', 'timo', null
   ],
@@ -467,12 +437,14 @@ const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli',
 
 let token = null;
 let tokenClient = null;
-let unterordner = [];      // [{id, name}]
-let dateien = [];          // alle Dateien mit .ordner und .tagSchluessel
+let unterordner = [];
+let dateien = [];
 let wochenStart = montagVon(new Date());
+let ansicht = 'zeitleiste';   // oder 'woche'
 
 const el = {
   anmelden:  document.getElementById('anmelden'),
+  ansicht:   document.getElementById('ansicht'),
   neuladen:  document.getElementById('neuladen'),
   status:    document.getElementById('status'),
   fehler:    document.getElementById('fehler'),
@@ -489,8 +461,11 @@ const el = {
   leiste:    document.getElementById('wochenleiste'),
   titel:     document.getElementById('wochentitel'),
   dran:      document.getElementById('dran'),
+  zeitleiste:document.getElementById('zeitleiste'),
   woche:     document.getElementById('woche'),
-  liste:     document.getElementById('liste'),
+  uebersicht:document.getElementById('uebersicht'),
+  zahlen:    document.getElementById('zahlen'),
+  raster:    document.getElementById('raster'),
   overlay:   document.getElementById('overlay'),
   overlayIn: document.getElementById('overlay-inhalt')
 };
@@ -498,16 +473,13 @@ const el = {
 
 // ============ DATUM ============
 
-/** Montag der Woche, in der d liegt. */
 function montagVon(d) {
   const x = new Date(d);
-  const versatz = (x.getDay() + 6) % 7;   // So=0 → 6
-  x.setDate(x.getDate() - versatz);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
   x.setHours(0, 0, 0, 0);
   return x;
 }
 
-/** 2026-08-10 – als Schlüssel zum Gruppieren, in lokaler Zeit. */
 function schluessel(d) {
   const x = new Date(d);
   return x.getFullYear() + '-'
@@ -524,10 +496,6 @@ function plusTage(d, n) {
 
 // ============ WER IST DRAN ============
 
-/**
- * Gibt den Namen zurück, der an diesem Tag dran ist –
- * oder null, wenn Pausentag.
- */
 function werIstDran(tag) {
   const start = new Date(CONFIG.ZYKLUS_START + 'T00:00:00');
   const jetzt = new Date(tag);
@@ -535,12 +503,9 @@ function werIstDran(tag) {
 
   const laenge = CONFIG.REIHENFOLGE.length;
   const abstand = Math.round((jetzt - start) / 86400000);
-  const index = ((abstand % laenge) + laenge) % laenge;
-
-  return CONFIG.REIHENFOLGE[index];
+  return CONFIG.REIHENFOLGE[((abstand % laenge) + laenge) % laenge];
 }
 
-/** Sucht den Drive-Unterordner, der zu einem Namen gehört. */
 function ordnerFuer(name) {
   if (!name) return null;
   const gesucht = name.toLowerCase();
@@ -549,19 +514,40 @@ function ordnerFuer(name) {
   }) || null;
 }
 
-
 /**
- * Zu welchem Tag gehört eine Datei?
- *
- * Normalerweise der Upload-Zeitpunkt. Wer aber etwas nachreicht,
- * lädt es mit einem vorangestellten Datum hoch – dann zählt das,
- * damit das Video am richtigen Tag erscheint und nicht am Tag des
- * Nachreichens. Für das Löschen bleibt der echte Upload-Zeitpunkt
- * maßgeblich; das entscheidet das Apps Script.
+ * Zu welchem Tag gehört eine Datei? Normalerweise der Upload-
+ * Zeitpunkt – wer aber nachreicht, lädt mit vorangestelltem Datum
+ * hoch, dann zählt das.
  */
 function tagAus(datei) {
   const treffer = /^(\d{4}-\d{2}-\d{2})_/.exec(datei.name || '');
   return treffer ? treffer[1] : schluessel(datei.createdTime);
+}
+
+/** Alle Clips eines Tages von der Person, die dran war. */
+function clipsVon(tagSchluessel, name) {
+  const ordner = ordnerFuer(name);
+  if (!ordner) return [];
+  return dateien
+    .filter(function (d) {
+      return d.tagSchluessel === tagSchluessel && d.ordner === ordner.name;
+    })
+    .sort(nachName);
+}
+
+/** Alles, was an dem Tag sonst noch hochgeladen wurde. */
+function extrasVon(tagSchluessel, name) {
+  const ordner = ordnerFuer(name);
+  return dateien
+    .filter(function (d) {
+      return d.tagSchluessel === tagSchluessel
+          && (!ordner || d.ordner !== ordner.name);
+    })
+    .sort(nachName);
+}
+
+function nachName(a, b) {
+  return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
 }
 
 
@@ -589,6 +575,7 @@ window.onload = function () {
         token = antwort.access_token;
         el.anmelden.hidden = true;
         el.neuladen.hidden = false;
+        el.ansicht.hidden = false;
         el.bereich.hidden = false;
         laden();
       }
@@ -598,6 +585,11 @@ window.onload = function () {
 
 el.anmelden.onclick = function () { tokenClient.requestAccessToken(); };
 el.neuladen.onclick = function () { laden(); };
+
+el.ansicht.onclick = function () {
+  ansicht = ansicht === 'zeitleiste' ? 'woche' : 'zeitleiste';
+  zeichne();
+};
 
 
 // ============ HANDY-VORSCHAU ============
@@ -612,7 +604,7 @@ function setzeHandy(an) {
   document.body.classList.toggle('handy', an);
   handyKnopf.textContent = an ? 'Volle Breite' : 'Handy-Ansicht';
   try { localStorage.setItem('videotagebuch.handy', an ? '1' : '0'); } catch (e) {}
-  if (dateien.length || token) zeichne();
+  if (token) zeichne();
 }
 
 try {
@@ -673,9 +665,6 @@ async function dateienHolen() {
   return ergebnis;
 }
 
-
-// ============ LADEN ============
-
 async function laden() {
   el.fehler.hidden = true;
   el.status.hidden = false;
@@ -685,10 +674,8 @@ async function laden() {
     unterordner = await ordnerHolen();
     fuellePersonen();
     dateien = await dateienHolen();
-
     el.status.hidden = true;
     zeichne();
-
   } catch (fehler) {
     el.status.hidden = true;
     zeigeFehler(fehler.message);
@@ -696,74 +683,197 @@ async function laden() {
 }
 
 
-// ============ WOCHENANSICHT ============
+// ============ ZEICHNEN ============
 
-document.getElementById('zurueck').onclick = function () {
-  wochenStart = plusTage(wochenStart, -7);
-  zeichne();
-};
-document.getElementById('vor').onclick = function () {
-  wochenStart = plusTage(wochenStart, 7);
-  zeichne();
-};
-document.getElementById('diesewoche').onclick = function () {
-  wochenStart = montagVon(new Date());
-  zeichne();
-};
-
-/**
- * Schmale Bildschirme bekommen die Zeitleiste, breite das
- * Wochenraster. Sieben Spalten nebeneinander funktionieren auf
- * einem Telefon nicht.
- */
 function istSchmal() {
-  return document.body.classList.contains('handy')
-      || window.innerWidth < 700;
+  return document.body.classList.contains('handy') || window.innerWidth < 700;
 }
 
 function zeichne() {
-  if (!dateien) return;
+  // Auf schmalen Bildschirmen gibt es kein Wochenraster – sieben
+  // Spalten nebeneinander funktionieren auf einem Telefon nicht.
+  const wochenAnsicht = ansicht === 'woche' && !istSchmal();
 
-  if (istSchmal()) {
-    el.leiste.hidden = true;
-    el.woche.hidden = true;
-    el.liste.hidden = false;
-    zeichneListe();
-  } else {
-    el.leiste.hidden = false;
-    el.woche.hidden = false;
-    el.liste.hidden = true;
-    zeichneWoche();
-  }
+  el.ansicht.textContent = wochenAnsicht ? 'Zeitleiste' : 'Wochenraster';
+  el.ansicht.hidden = istSchmal();
+
+  el.leiste.hidden      = !wochenAnsicht;
+  el.woche.hidden       = !wochenAnsicht;
+  el.zeitleiste.hidden  = wochenAnsicht;
+
+  if (wochenAnsicht) zeichneWoche(); else zeichneZeitleiste();
+  zeichneUebersicht();
 }
 
-// Beim Größenändern des Fensters umschalten, aber nicht bei jedem Pixel
 let umschaltTimer = null;
 window.addEventListener('resize', function () {
   clearTimeout(umschaltTimer);
-  umschaltTimer = setTimeout(zeichne, 150);
+  if (token) umschaltTimer = setTimeout(zeichne, 150);
 });
+
+
+// ============ ZEITLEISTE ============
+
+function zeichneZeitleiste() {
+  el.zeitleiste.innerHTML = '';
+  const heute = schluessel(new Date());
+
+  for (let i = 0; i < CONFIG.ZEITLEISTE_TAGE; i++) {
+    el.zeitleiste.appendChild(tagZeile(plusTage(new Date(), -i), heute));
+  }
+}
+
+function tagZeile(tag, heuteSchluessel) {
+  const s = schluessel(tag);
+  const dran = werIstDran(tag);
+  const zeile = document.createElement('article');
+  zeile.className = 'tagzeile';
+
+  // ---- Datumsspalte ----
+  const datum = document.createElement('div');
+  datum.className = 'datumspalte';
+  datum.innerHTML =
+      '<div class="zahl">' + tag.getDate() + '</div>'
+    + '<div class="monat">' + WOCHENTAGE[(tag.getDay() + 6) % 7]
+    + ' ' + MONATE[tag.getMonth()].slice(0, 3) + '</div>'
+    + (s === heuteSchluessel ? '<div class="heute">heute</div>' : '');
+  zeile.appendChild(datum);
+
+  // ---- Inhalt ----
+  const inhalt = document.createElement('div');
+  inhalt.className = 'inhalt';
+
+  if (dran === null) {
+    zeile.classList.add('leerlauf');
+    inhalt.innerHTML = '<div class="wer">Pausentag</div>'
+                     + '<div class="pausenfeld">niemand dran</div>';
+    zeile.appendChild(inhalt);
+    ergaenzeExtras(inhalt, s, dran);
+    return zeile;
+  }
+
+  const clips = clipsVon(s, dran);
+
+  const wer = document.createElement('div');
+  wer.className = 'wer';
+  wer.innerHTML = escape_(dran)
+    + (clips.length > 1 ? ' <span>' + clips.length + ' Clips</span>' : '');
+  inhalt.appendChild(wer);
+
+  if (clips.length) {
+    inhalt.appendChild(kachelReihe(clips));
+  } else {
+    zeile.classList.add('leerlauf');
+    const leer = document.createElement('div');
+    leer.className = 'keins';
+    leer.textContent = ordnerFuer(dran)
+      ? (tag > new Date() ? 'steht noch aus' : 'kein Video')
+      : 'noch kein Ordner angelegt';
+    inhalt.appendChild(leer);
+  }
+
+  zeile.appendChild(inhalt);
+  ergaenzeExtras(inhalt, s, dran);
+  return zeile;
+}
+
+function kachelReihe(clips) {
+  const reihe = document.createElement('div');
+  reihe.className = 'clips';
+  clips.forEach(function (datei, i) {
+    reihe.appendChild(kachel(datei, clips, i));
+  });
+  return reihe;
+}
+
+function kachel(datei, gruppe, index) {
+  const k = document.createElement('div');
+  k.className = 'kachel';
+
+  if (datei.thumbnailLink) {
+    const img = document.createElement('img');
+    img.src = datei.thumbnailLink.replace(/=s\d+$/, '=s400');
+    img.referrerPolicy = 'no-referrer';
+    img.alt = '';
+    k.appendChild(img);
+  } else {
+    const wartet = document.createElement('div');
+    wartet.className = 'wartet';
+    wartet.textContent = 'wird verarbeitet';
+    k.appendChild(wartet);
+  }
+
+  if (datei.mimeType.indexOf('video/') === 0) {
+    const play = document.createElement('div');
+    play.className = 'play';
+    play.textContent = '▶';
+    k.appendChild(play);
+  }
+
+  k.onclick = function () { oeffneOverlay(gruppe, index); };
+  return k;
+}
+
+/**
+ * Videos, die nicht von der Person kommen, die dran war, tauchen
+ * nicht von allein auf – sonst wird die Zeitleiste unruhig. Sie
+ * lassen sich pro Tag über einen Knopf einblenden.
+ */
+function ergaenzeExtras(inhalt, tagSchluessel, dran) {
+  const extras = extrasVon(tagSchluessel, dran);
+  if (!extras.length) return;
+
+  const knopf = document.createElement('button');
+  knopf.className = 'extraknopf';
+  knopf.textContent = '+ ' + extras.length
+    + (extras.length === 1 ? ' Video außer der Reihe' : ' Videos außer der Reihe');
+
+  const kasten = document.createElement('div');
+  kasten.className = 'extras';
+  kasten.hidden = true;
+
+  const namen = Array.from(new Set(extras.map(function (d) { return d.ordner; })));
+  const wer = document.createElement('div');
+  wer.className = 'wer';
+  wer.textContent = namen.join(', ');
+  kasten.appendChild(wer);
+  kasten.appendChild(kachelReihe(extras));
+
+  knopf.onclick = function () {
+    kasten.hidden = !kasten.hidden;
+    knopf.textContent = (kasten.hidden ? '+ ' : '– ') + extras.length
+      + (extras.length === 1 ? ' Video außer der Reihe' : ' Videos außer der Reihe');
+  };
+
+  inhalt.appendChild(knopf);
+  inhalt.appendChild(kasten);
+}
+
+
+// ============ WOCHENRASTER ============
+
+document.getElementById('zurueck').onclick = function () {
+  wochenStart = plusTage(wochenStart, -7); zeichne();
+};
+document.getElementById('vor').onclick = function () {
+  wochenStart = plusTage(wochenStart, 7); zeichne();
+};
+document.getElementById('diesewoche').onclick = function () {
+  wochenStart = montagVon(new Date()); zeichne();
+};
 
 function zeichneWoche() {
   const ende = plusTage(wochenStart, 6);
   el.titel.textContent = titelText(wochenStart, ende);
-  zeigeWerDran();
+
+  const dran = werIstDran(new Date());
+  el.dran.textContent = dran === null ? 'heute Pausentag' : 'heute: ' + dran;
 
   el.woche.innerHTML = '';
-  const heuteSchluessel = schluessel(new Date());
-
+  const heute = schluessel(new Date());
   for (let i = 0; i < 7; i++) {
-    const tag = plusTage(wochenStart, i);
-    el.woche.appendChild(tagSpalte(tag, heuteSchluessel));
+    el.woche.appendChild(tagSpalte(plusTage(wochenStart, i), heute));
   }
-}
-
-/** Kleiner Hinweis über dem Raster: wer heute an der Reihe ist. */
-function zeigeWerDran() {
-  const dran = werIstDran(new Date());
-  el.dran.textContent = dran === null
-    ? 'Heute ist Pausentag.'
-    : 'Heute ist ' + dran + ' dran.';
 }
 
 function titelText(von, bis) {
@@ -782,218 +892,120 @@ function tagSpalte(tag, heuteSchluessel) {
   if (s === heuteSchluessel) spalte.classList.add('heute');
   if (tag.getTime() > Date.now()) spalte.classList.add('zukunft');
 
-  const kopf = document.createElement('div');
-  kopf.className = 'tagkopf';
-  kopf.innerHTML =
-      '<span class="wochentag">' + WOCHENTAGE[(tag.getDay() + 6) % 7] + '</span>'
-    + '<span class="datum">' + tag.getDate() + '.' + (tag.getMonth() + 1) + '.</span>';
-  spalte.appendChild(kopf);
+  spalte.innerHTML =
+      '<div class="tagkopf"><span>' + WOCHENTAGE[(tag.getDay() + 6) % 7]
+    + '</span><span>' + tag.getDate() + '.' + (tag.getMonth() + 1) + '.</span></div>';
 
   const dran = werIstDran(tag);
 
   if (dran === null) {
-    spalte.appendChild(pausenSlot());
+    spalte.innerHTML += '<div class="pausenfeld">Pause</div>';
     return spalte;
   }
 
-  // Videos dieses Tages aus dem Ordner der Person, die dran ist
-  const ordner = ordnerFuer(dran);
-  const treffer = ordner
-    ? dateien.filter(function (d) {
-        return d.tagSchluessel === s && d.ordner === ordner.name;
-      })
-    : [];
+  const clips = clipsVon(s, dran);
 
-  treffer.sort(nachName);
-
-  if (treffer.length) {
-    // Alle Clips eines Tages bilden einen Platz und werden
-    // nacheinander abgespielt.
-    spalte.appendChild(vollerSlot(treffer[0], dran, false, treffer));
+  if (clips.length) {
+    spalte.appendChild(kachel(clips[0], clips, 0));
+    if (clips.length > 1) {
+      const zaehler = document.createElement('div');
+      zaehler.className = 'wer';
+      zaehler.innerHTML = escape_(dran) + ' <span style="color:var(--grau);font-size:.72rem">'
+                        + clips.length + '</span>';
+      spalte.appendChild(zaehler);
+      return spalte;
+    }
   } else {
-    spalte.appendChild(leererSlot(dran, !ordner));
+    const leer = document.createElement('div');
+    leer.className = 'keins';
+    leer.style.aspectRatio = '3 / 4';
+    leer.textContent = '';
+    spalte.appendChild(leer);
   }
 
-  // Falls jemand außer der Reihe etwas hochgeladen hat, geht es
-  // nicht verloren – es erscheint darunter als Zusatz.
-  const zusatz = dateien.filter(function (d) {
-    return d.tagSchluessel === s && (!ordner || d.ordner !== ordner.name);
-  });
-  zusatz.forEach(function (d) {
-    spalte.appendChild(vollerSlot(d, d.ordner, true));
-  });
+  const wer = document.createElement('div');
+  wer.className = 'wer';
+  wer.textContent = dran;
+  if (!clips.length) wer.style.color = 'var(--blass)';
+  spalte.appendChild(wer);
 
   return spalte;
 }
 
-// ============ LISTENANSICHT ============
 
-/**
- * Ein Tag pro Zeile, beginnend mit heute, dann rückwärts bis zum
- * Ende der Aufbewahrung. Ältere Tage gibt es nicht mehr, die hat
- * das Apps Script gelöscht.
- */
-function zeichneListe() {
-  el.liste.innerHTML = '';
-  zeigeWerDran();
+// ============ BELEGUNGSÜBERSICHT ============
 
-  const heuteSchluessel = schluessel(new Date());
+function zeichneUebersicht() {
+  el.uebersicht.hidden = false;
 
-  for (let i = 0; i < CONFIG.AUFBEWAHRUNG_TAGE; i++) {
+  // ---- Kennzahlen ----
+  let faellig = 0, geliefert = 0, bytes = 0;
+
+  for (let i = 1; i <= CONFIG.AUFBEWAHRUNG_TAGE; i++) {
     const tag = plusTage(new Date(), -i);
-    el.liste.appendChild(tagZeile(tag, heuteSchluessel));
-  }
-}
-
-function tagZeile(tag, heuteSchluessel) {
-  const s = schluessel(tag);
-  const dran = werIstDran(tag);
-  const zeile = document.createElement('div');
-  zeile.className = 'zeile';
-  if (s === heuteSchluessel) zeile.classList.add('heute');
-
-  const datumText = WOCHENTAGE[(tag.getDay() + 6) % 7] + ' '
-                  + tag.getDate() + '.' + (tag.getMonth() + 1) + '.'
-                  + (s === heuteSchluessel ? ' · heute' : '');
-
-  if (dran === null) {
-    zeile.classList.add('pause');
-    zeile.innerHTML =
-        '<div class="miniatur">Pause</div>'
-      + '<div class="text"><div class="datum">' + datumText + '</div>'
-      + '<div class="wer">Pausentag</div></div>';
-    return zeile;
+    const dran = werIstDran(tag);
+    if (dran === null) continue;
+    faellig++;
+    if (clipsVon(schluessel(tag), dran).length) geliefert++;
   }
 
-  const ordner = ordnerFuer(dran);
-  const treffer = ordner
-    ? dateien.filter(function (d) {
-        return d.tagSchluessel === s && d.ordner === ordner.name;
-      })
-    : [];
-  treffer.sort(nachName);
-  const datei = treffer[0];
+  dateien.forEach(function (d) { bytes += Number(d.size) || 0; });
 
-  const miniatur = document.createElement('div');
-  miniatur.className = 'miniatur';
+  // Serie: wie viele fällige Tage am Stück zuletzt geliefert wurden
+  let serie = 0;
+  for (let i = 1; i <= CONFIG.AUFBEWAHRUNG_TAGE; i++) {
+    const tag = plusTage(new Date(), -i);
+    const dran = werIstDran(tag);
+    if (dran === null) continue;
+    if (clipsVon(schluessel(tag), dran).length) serie++;
+    else break;
+  }
 
-  if (datei) {
-    if (datei.thumbnailLink) {
-      const img = document.createElement('img');
-      img.src = datei.thumbnailLink.replace(/=s\d+$/, '=s200');
-      img.referrerPolicy = 'no-referrer';
-      img.alt = '';
-      miniatur.appendChild(img);
-    } else {
-      miniatur.textContent = 'wird verarbeitet';
+  el.zahlen.innerHTML =
+      kennzahl('letzte 30 Tage', geliefert + ' von ' + faellig)
+    + kennzahl('Serie', serie + (serie === 1 ? ' Tag' : ' Tage'))
+    + kennzahl('Speicher', (bytes / 1073741824).toFixed(1).replace('.', ',') + ' GB');
+
+  // ---- Punkteraster: die letzten Einsätze jeder Person ----
+  el.raster.innerHTML = '';
+
+  CONFIG.REIHENFOLGE.forEach(function (name) {
+    if (!name) return;
+
+    const eintraege = [];
+    for (let i = 1; i <= CONFIG.AUFBEWAHRUNG_TAGE && eintraege.length < 7; i++) {
+      const tag = plusTage(new Date(), -i);
+      if (werIstDran(tag) !== name) continue;
+      eintraege.unshift(clipsVon(schluessel(tag), name).length > 0);
     }
-    if (datei.mimeType.indexOf('video/') === 0) {
-      const play = document.createElement('div');
-      play.className = 'play';
-      play.textContent = '▶';
-      miniatur.appendChild(play);
-    }
-    miniatur.onclick = function () { oeffneOverlay(treffer, 0); };
-  } else {
-    zeile.classList.add('fehlt');
-    miniatur.textContent = ordner ? '–' : 'kein Ordner';
-  }
 
-  zeile.appendChild(miniatur);
+    const zeile = document.createElement('tr');
+    zeile.innerHTML = '<td class="person">' + escape_(name) + '</td>'
+      + eintraege.map(function (da) {
+          return '<td class="punkt ' + (da ? 'da' : 'fehlt') + '">'
+               + (da ? '●' : '○') + '</td>';
+        }).join('')
+      + '<td></td>'.repeat(Math.max(0, 7 - eintraege.length));
+    el.raster.appendChild(zeile);
+  });
 
-  const text = document.createElement('div');
-  text.className = 'text';
-  text.innerHTML = '<div class="datum">' + datumText + '</div>'
-                 + '<div class="wer">' + escape_(dran) + '</div>';
+  const legende = document.createElement('tr');
+  legende.innerHTML = '<td class="legende" colspan="8">'
+    + 'Die letzten sieben eigenen Termine, ältester links. '
+    + '● geliefert, ○ ausgelassen.</td>';
+  el.raster.appendChild(legende);
+}
 
-  if (datei) {
-    const rest = tageBisLoeschung(datei.createdTime);
-    const zeit = document.createElement('div');
-    zeit.className = 'rest' + (rest <= 3 ? ' bald' : '');
-    const gesamtMb = treffer.reduce(function (summe, d) {
-      return summe + (Number(d.size) || 0);
-    }, 0);
-    zeit.textContent = (treffer.length > 1 ? treffer.length + ' Clips · ' : '')
-                     + mb(gesamtMb) + ' MB · noch ' + rest + ' Tage';
-    text.appendChild(zeit);
-  } else {
-    const hinweis = document.createElement('div');
-    hinweis.className = 'rest';
-    hinweis.textContent = tag > new Date() ? 'steht noch aus' : 'kein Video';
-    text.appendChild(hinweis);
-  }
-
-  zeile.appendChild(text);
-  return zeile;
+function kennzahl(titel, wert) {
+  return '<div class="kennzahl"><div class="titel">' + titel
+       + '</div><div class="wert">' + wert + '</div></div>';
 }
 
 
-function pausenSlot() {
-  const slot = document.createElement('div');
-  slot.className = 'slot pause';
-  slot.innerHTML = '<div class="bild">Pause</div><div class="name">frei</div>';
-  return slot;
-}
+// ============ ABSPIELEN ============
 
-/** Sortiert nach Dateiname – der beginnt mit Datum und Uhrzeit. */
-function nachName(a, b) {
-  return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
-}
-
-function vollerSlot(datei, name, ausserDerReihe, gruppe) {
-  const liste = gruppe || [datei];
-  const slot = document.createElement('div');
-  slot.className = 'slot voll' + (ausserDerReihe ? ' zusatz' : '');
-
-  const bild = document.createElement('div');
-  bild.className = 'bild';
-
-  if (datei.thumbnailLink) {
-    const img = document.createElement('img');
-    img.src = datei.thumbnailLink.replace(/=s\d+$/, '=s400');
-    img.referrerPolicy = 'no-referrer';
-    img.alt = '';
-    bild.appendChild(img);
-  } else {
-    bild.textContent = 'wird verarbeitet';
-  }
-
-  if (datei.mimeType.indexOf('video/') === 0) {
-    const play = document.createElement('div');
-    play.className = 'play';
-    play.textContent = '▶';
-    bild.appendChild(play);
-  }
-
-  if (liste.length > 1) {
-    const zaehler = document.createElement('div');
-    zaehler.className = 'anzahl';
-    zaehler.textContent = liste.length + ' Clips';
-    bild.appendChild(zaehler);
-  }
-
-  bild.onclick = function () { oeffneOverlay(liste, 0); };
-  slot.appendChild(bild);
-
-  const beschriftung = document.createElement('div');
-  beschriftung.className = 'name';
-  beschriftung.textContent = name;
-  beschriftung.title = datei.name + ' · ' + mb(datei.size) + ' MB';
-  slot.appendChild(beschriftung);
-
-  return slot;
-}
-
-function leererSlot(name, ohneOrdner) {
-  const slot = document.createElement('div');
-  slot.className = 'slot leer';
-  slot.innerHTML = '<div class="bild">' + (ohneOrdner ? 'kein Ordner' : '–') + '</div>'
-                 + '<div class="name">' + escape_(name) + '</div>';
-  return slot;
-}
-
-
-// ============ OVERLAY ============
+let wiedergabe = { liste: [], index: 0 };
+let bildTimer = null;
 
 el.overlay.onclick = function (e) {
   if (e.target === el.overlay) schliesseOverlay();
@@ -1007,14 +1019,6 @@ function schliesseOverlay() {
   el.overlay.hidden = true;
   el.overlayIn.innerHTML = '';
 }
-
-/**
- * Spielt eine ganze Tagesfolge ab: Ist ein Clip zu Ende, läuft der
- * nächste automatisch weiter. Der jeweils folgende wird schon
- * während des laufenden geladen, damit der Übergang nicht hakt.
- */
-let wiedergabe = { liste: [], index: 0 };
-let bildTimer = null;
 
 function oeffneOverlay(eingabe, start) {
   wiedergabe.liste = Array.isArray(eingabe) ? eingabe : [eingabe];
@@ -1048,9 +1052,7 @@ async function zeigeClip() {
       ladeanzeige.textContent = 'lädt … ' + p + ' %';
     });
 
-    // Ist der Nutzer inzwischen weitergesprungen, nichts mehr tun
     if (wiedergabe.liste[wiedergabe.index] !== datei) return;
-
     el.overlayIn.innerHTML = '';
 
     let anzeige;
@@ -1066,15 +1068,13 @@ async function zeigeClip() {
     } else {
       anzeige = document.createElement('img');
       anzeige.className = 'voll';
-      // Bilder haben keine Länge – sie bleiben eine feste Zeit stehen,
-      // damit eine Folge aus Videos und Fotos gleichmäßig durchläuft.
       if (wiedergabe.liste.length > 1) {
         bildTimer = setTimeout(naechsterClip, CONFIG.BILD_SEKUNDEN * 1000);
       }
     }
     anzeige.src = url;
     el.overlayIn.appendChild(anzeige);
-    el.overlayIn.appendChild(leiste(datei, url));
+    el.overlayIn.appendChild(spielLeiste(datei, url));
 
     vorladen();
 
@@ -1084,15 +1084,12 @@ async function zeigeClip() {
   }
 }
 
-/** Holt den nächsten Clip still im Hintergrund. */
 function vorladen() {
   const naechste = wiedergabe.liste[wiedergabe.index + 1];
-  if (naechste && !naechste._url) {
-    blobUrl(naechste).catch(function () {});
-  }
+  if (naechste && !naechste._url) blobUrl(naechste).catch(function () {});
 }
 
-function leiste(datei, url) {
+function spielLeiste(datei, url) {
   const l = document.createElement('div');
   l.className = 'leiste';
 
@@ -1103,7 +1100,7 @@ function leiste(datei, url) {
   const info = document.createElement('span');
   info.className = 'info';
   info.textContent = datei.vorschau
-    ? zaehler + escape_(datei.name) + ' · ' + mb(datei.size) + ' MB · noch nicht hochgeladen'
+    ? zaehler + datei.name + ' · ' + mb(datei.size) + ' MB · noch nicht hochgeladen'
     : zaehler + datei.ordner + ' · ' + mb(datei.size)
       + ' MB · noch ' + tageBisLoeschung(datei.createdTime) + ' Tage';
   l.appendChild(info);
@@ -1111,14 +1108,12 @@ function leiste(datei, url) {
   if (gesamt > 1) {
     const zurueck = document.createElement('button');
     zurueck.textContent = '‹';
-    zurueck.title = 'vorheriger Clip';
     zurueck.disabled = wiedergabe.index === 0;
     zurueck.onclick = vorherigerClip;
     l.appendChild(zurueck);
 
     const weiter = document.createElement('button');
     weiter.textContent = '›';
-    weiter.title = 'nächster Clip';
     weiter.disabled = wiedergabe.index + 1 >= gesamt;
     weiter.onclick = naechsterClip;
     l.appendChild(weiter);
@@ -1192,16 +1187,11 @@ async function blobUrl(datei, fortschritt) {
 }
 
 
-// ============ HOCHLADEN ============
+// ============ ZUSAMMENSTELLEN UND HOCHLADEN ============
+
+let entwurf = [];
 
 el.waehlen.onclick = function () { el.datei.click(); };
-
-/**
- * Ausgewählte Dateien landen erst in dieser Liste. Dort lässt sich
- * die Reihenfolge ändern, einzelne entfernen und das Ganze vorab
- * ansehen. Hochgeladen wird erst auf Knopfdruck.
- */
-let entwurf = [];
 
 el.datei.onchange = function () {
   Array.prototype.slice.call(el.datei.files).forEach(function (datei) {
@@ -1238,8 +1228,8 @@ function zeichneEntwurf() {
     const mini = document.createElement('div');
     mini.className = 'mini';
     if (eintrag.mimeType.indexOf('video/') === 0) {
-      // Ein stummes Video zeigt seinen ersten Frame – das ist
-      // billiger als selbst ein Vorschaubild zu berechnen.
+      // Ein stummes Video zeigt seinen ersten Frame – billiger,
+      // als selbst ein Standbild zu berechnen.
       const v = document.createElement('video');
       v.src = eintrag.url + '#t=0.1';
       v.muted = true;
@@ -1268,21 +1258,18 @@ function zeichneEntwurf() {
 
     const hoch = document.createElement('button');
     hoch.textContent = '↑';
-    hoch.title = 'nach vorne';
     hoch.disabled = i === 0;
     hoch.onclick = function () { tausche(i, i - 1); };
     knoepfe.appendChild(hoch);
 
     const runter = document.createElement('button');
     runter.textContent = '↓';
-    runter.title = 'nach hinten';
     runter.disabled = i === entwurf.length - 1;
     runter.onclick = function () { tausche(i, i + 1); };
     knoepfe.appendChild(runter);
 
     const weg = document.createElement('button');
     weg.textContent = '✕';
-    weg.title = 'entfernen';
     weg.onclick = function () { entferne(i); };
     knoepfe.appendChild(weg);
 
@@ -1313,18 +1300,14 @@ function leereEntwurf() {
 document.getElementById('mehr').onclick = function () { el.datei.click(); };
 document.getElementById('verwerfen').onclick = leereEntwurf;
 
-/** Spielt den Entwurf ab, ohne dass etwas hochgeladen wurde. */
 document.getElementById('vorschau').onclick = function () {
   if (!entwurf.length) return;
   oeffneOverlay(entwurf.map(function (e) {
     return {
-      name: e.name,
-      mimeType: e.mimeType,
-      size: e.size,
-      ordner: 'Vorschau',
-      createdTime: new Date().toISOString(),
+      name: e.name, mimeType: e.mimeType, size: e.size,
+      ordner: 'Vorschau', createdTime: new Date().toISOString(),
       vorschau: true,
-      _url: e.url          // schon vorhanden, blobUrl lädt nichts nach
+      _url: e.url          // schon vorhanden, es wird nichts nachgeladen
     };
   }), 0);
 };
@@ -1367,14 +1350,13 @@ document.getElementById('absenden').onclick = async function () {
   } finally {
     el.waehlen.disabled = false;
     el.balken.hidden = true;
-    el.fuer.value = '0';   // beim nächsten Mal wieder "heute"
+    el.fuer.value = '0';
     merkePerson();
   }
 };
 
 function setzeBalken(p) { el.balken.firstElementChild.style.width = p + '%'; }
 
-/** HHMMSS plus laufende Nummer, damit die Sortierung eindeutig bleibt. */
 function uhrzeitMarke(lfdNr) {
   const d = new Date();
   return String(d.getHours()).padStart(2, '0')
@@ -1390,8 +1372,7 @@ function uhrzeitMarke(lfdNr) {
  */
 async function hochladen(datei, ordnerId, fortschritt, fuerTag, lfdNr) {
   // Datum vorn für die Zuordnung zum Tag, danach eine Uhrzeit,
-  // damit mehrere Clips eines Tages in der Reihenfolge bleiben,
-  // in der sie aufgenommen wurden.
+  // damit mehrere Clips in ihrer Reihenfolge bleiben.
   const name = schluessel(fuerTag || new Date()) + '_'
              + uhrzeitMarke(lfdNr) + '_' + datei.name;
 
