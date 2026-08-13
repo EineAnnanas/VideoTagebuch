@@ -62,18 +62,60 @@
     margin-right: auto;
   }
 
+  /* ---- Knöpfe ----
+     Drei Stufen: normal, wichtig (dunkel gefüllt), leise (ohne
+     Rahmen). Mindesthöhe 36 px, damit sie am Handy gut zu treffen
+     sind. Der Hover-Effekt gilt nur für Geräte mit Mauszeiger –
+     auf Touchscreens bleibt er sonst nach dem Tippen kleben. */
   button, select {
     font: inherit;
-    font-size: .85rem;
-    padding: .35rem .7rem;
+    font-size: .84rem;
+    line-height: 1;
+    padding: .55rem .85rem;
+    min-height: 36px;
     border: 1px solid var(--rand);
     background: var(--flaeche);
     color: var(--text);
     cursor: pointer;
-    border-radius: 3px;
+    border-radius: 6px;
+    transition: background .12s ease, border-color .12s ease;
   }
-  button:hover:not(:disabled) { background: #f2f0e8; }
-  button:disabled { opacity: .4; cursor: default; }
+  select { padding-right: .5rem; }
+
+  @media (hover: hover) {
+    button:hover:not(:disabled) { background: #f3f1e9; border-color: var(--blass); }
+  }
+  button:active:not(:disabled) { background: #eae7db; }
+  button:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+  button:disabled { opacity: .35; cursor: default; }
+
+  button.wichtig {
+    background: var(--text);
+    border-color: var(--text);
+    color: var(--papier);
+  }
+  @media (hover: hover) {
+    button.wichtig:hover:not(:disabled) { background: #45433b; border-color: #45433b; }
+  }
+  button.wichtig:active:not(:disabled) { background: #1e1d19; }
+
+  button.leise {
+    background: transparent;
+    border-color: transparent;
+    color: var(--grau);
+  }
+  @media (hover: hover) {
+    button.leise:hover:not(:disabled) { background: rgba(44,43,38,.06); border-color: transparent; }
+  }
+
+  button.symbol {
+    padding: 0;
+    width: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
 
   /* ---- Hochladen ---- */
   #hochladen-bereich {
@@ -135,10 +177,8 @@
   .eintrag .beschriftung { flex: 1 1 auto; min-width: 0; font-size: .8rem; }
   .eintrag .dateiname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .eintrag .klein { color: var(--grau); font-size: .73rem; }
-  .eintrag .knoepfe { display: flex; gap: .2rem; flex: 0 0 auto; }
-  .eintrag .knoepfe button { padding: .28rem .45rem; min-width: 1.9rem; line-height: 1; }
-  .composer-aktionen { display: flex; gap: .4rem; flex-wrap: wrap; }
-  #absenden { border-color: var(--text); }
+  .eintrag .knoepfe { display: flex; gap: .25rem; flex: 0 0 auto; }
+  .composer-aktionen { display: flex; gap: .45rem; flex-wrap: wrap; }
 
   /* ---- Zeitleiste ---- */
   .tagzeile {
@@ -217,12 +257,7 @@
     color: var(--grau);
   }
 
-  .extraknopf {
-    margin-top: .5rem;
-    font-size: .75rem;
-    padding: .25rem .55rem;
-    color: var(--grau);
-  }
+  .extraknopf { margin-top: .55rem; font-size: .78rem; }
   .extras { margin-top: .5rem; }
   .extras .wer { font-size: .8rem; font-family: system-ui, sans-serif; color: var(--grau); }
 
@@ -332,10 +367,10 @@
 
 <header>
   <h1>Videotagebuch</h1>
-  <button id="anmelden">Mit Google anmelden</button>
-  <button id="ansicht" hidden>Wochenraster</button>
-  <button id="neuladen" hidden>Neu laden</button>
-  <button id="handyknopf">Handy-Ansicht</button>
+  <button id="anmelden" class="wichtig">Mit Google anmelden</button>
+  <button id="ansicht" class="leise" hidden>Wochenraster</button>
+  <button id="neuladen" class="leise" hidden>Neu laden</button>
+  <button id="handyknopf" class="leise">Handy-Ansicht</button>
 </header>
 
 <div id="hochladen-bereich" hidden>
@@ -347,7 +382,7 @@
     <option value="1">gestern</option>
     <option value="2">vorgestern</option>
   </select>
-  <button id="waehlen">Videos auswählen</button>
+  <button id="waehlen" class="wichtig">Videos auswählen</button>
   <input type="file" id="datei" accept="video/*,image/*" multiple hidden>
   <span id="hochladen-status"></span>
   <div id="balken" hidden><div></div></div>
@@ -360,10 +395,10 @@
   </div>
   <ol id="composer-liste"></ol>
   <div class="composer-aktionen">
+    <button id="absenden" class="wichtig">Hochladen</button>
     <button id="vorschau">Vorschau ansehen</button>
     <button id="mehr">Weitere hinzufügen</button>
-    <button id="absenden">Hochladen</button>
-    <button id="verwerfen">Verwerfen</button>
+    <button id="verwerfen" class="leise">Verwerfen</button>
   </div>
 </section>
 
@@ -371,10 +406,10 @@
 <p id="status">Nicht angemeldet.</p>
 
 <nav id="wochenleiste" hidden>
-  <button id="zurueck" title="Woche zurück">‹</button>
-  <button id="vor" title="Woche vor">›</button>
+  <button id="zurueck" class="symbol" title="Woche zurück">‹</button>
+  <button id="vor" class="symbol" title="Woche vor">›</button>
   <span id="wochentitel"></span>
-  <button id="diesewoche">Diese Woche</button>
+  <button id="diesewoche" class="leise">Diese Woche</button>
   <span id="dran"></span>
 </nav>
 
@@ -824,7 +859,7 @@ function ergaenzeExtras(inhalt, tagSchluessel, dran) {
   if (!extras.length) return;
 
   const knopf = document.createElement('button');
-  knopf.className = 'extraknopf';
+  knopf.className = 'extraknopf leise';
   knopf.textContent = '+ ' + extras.length
     + (extras.length === 1 ? ' Video außer der Reihe' : ' Videos außer der Reihe');
 
@@ -1107,13 +1142,17 @@ function spielLeiste(datei, url) {
 
   if (gesamt > 1) {
     const zurueck = document.createElement('button');
+    zurueck.className = 'symbol';
     zurueck.textContent = '‹';
+    zurueck.title = 'vorheriger Clip';
     zurueck.disabled = wiedergabe.index === 0;
     zurueck.onclick = vorherigerClip;
     l.appendChild(zurueck);
 
     const weiter = document.createElement('button');
+    weiter.className = 'symbol';
     weiter.textContent = '›';
+    weiter.title = 'nächster Clip';
     weiter.disabled = wiedergabe.index + 1 >= gesamt;
     weiter.onclick = naechsterClip;
     l.appendChild(weiter);
@@ -1121,6 +1160,7 @@ function spielLeiste(datei, url) {
 
   if (!datei.vorschau) {
     const laden = document.createElement('button');
+    laden.className = 'leise';
     laden.textContent = 'Herunterladen';
     laden.onclick = function () {
       const a = document.createElement('a');
@@ -1257,19 +1297,25 @@ function zeichneEntwurf() {
     knoepfe.className = 'knoepfe';
 
     const hoch = document.createElement('button');
+    hoch.className = 'symbol';
     hoch.textContent = '↑';
+    hoch.title = 'nach vorne';
     hoch.disabled = i === 0;
     hoch.onclick = function () { tausche(i, i - 1); };
     knoepfe.appendChild(hoch);
 
     const runter = document.createElement('button');
+    runter.className = 'symbol';
     runter.textContent = '↓';
+    runter.title = 'nach hinten';
     runter.disabled = i === entwurf.length - 1;
     runter.onclick = function () { tausche(i, i + 1); };
     knoepfe.appendChild(runter);
 
     const weg = document.createElement('button');
+    weg.className = 'symbol leise';
     weg.textContent = '✕';
+    weg.title = 'entfernen';
     weg.onclick = function () { entferne(i); };
     knoepfe.appendChild(weg);
 
