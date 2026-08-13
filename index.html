@@ -178,6 +178,13 @@
   .eintrag .dateiname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .eintrag .klein { color: var(--grau); font-size: .73rem; }
   .eintrag .knoepfe { display: flex; gap: .25rem; flex: 0 0 auto; }
+  .eintrag.beanstandet { border-color: #d8b9b1; background: #fbf3f1; }
+  .eintrag .beanstandung { color: #8c2f22; font-size: .73rem; }
+  #composer-urteil {
+    color: #8c2f22;
+    font-size: .8rem;
+    margin: 0 0 .7rem;
+  }
   .composer-aktionen { display: flex; gap: .45rem; flex-wrap: wrap; }
 
   /* ---- Zeitleiste ---- */
@@ -399,6 +406,7 @@
     <span class="hinweis">Reihenfolge festlegen, ansehen, dann abschicken.</span>
   </div>
   <ol id="composer-liste"></ol>
+  <p id="composer-urteil" hidden></p>
   <div class="composer-aktionen">
     <button id="absenden" class="wichtig">Hochladen</button>
     <button id="vorschau">Vorschau ansehen</button>
@@ -463,11 +471,38 @@ const CONFIG = {
   // Erster Tag des Zyklus – an diesem Tag ist der erste Name dran.
   ZYKLUS_START: '2026-08-10',
 
-  // Erlaubte Konten. Leer lassen heißt: jeder, der Zugriff auf den
-  // geteilten Ordner hat, darf mitmachen – das ist die einfachere
-  // Variante, weil die Freigabe in Drive dann die einzige Liste ist,
-  // die du pflegen musst.
-  KONTEN: [],
+  // Die Projekt-Konten. Meldet sich jemand mit seinem privaten Konto
+  // an, warnt die Seite: Dort ist meist kaum Platz frei, und das
+  // Video zählte gegen den eigenen Speicher.
+  // Leer lassen schaltet die Prüfung ab.
+  KONTEN: [
+    'speicherplatzfurvlogs@gmail.com',
+    'auskunftgesucht@gmail.com'
+  ],
+
+  // Ab wie wenig freiem Speicher gewarnt wird (in GB).
+  SPEICHER_WARNUNG_GB: 2,
+
+  // Grenzen fürs Hochladen.
+  //
+  // Das sind Leitplanken, keine Schlösser: Wer will, kann immer noch
+  // direkt in Drive hochladen. Sie verhindern das Versehen, nicht die
+  // Absicht – und Versehen ist hier das eigentliche Risiko, weil ein
+  // einziges 4K-Video den Speicher für alle wegfrisst.
+  //
+  // 0 schaltet die jeweilige Grenze ab.
+  GRENZEN: {
+    // Kurze Seite des Bildes. 1080 lässt Full HD durch (1080×1920
+    // hochkant), weist 4K aber ab (2160×3840).
+    KURZE_SEITE: 1080,
+
+    MINUTEN_PRO_CLIP: 5,
+    MB_PRO_DATEI: 400,
+
+    // Alles, was an einem Tag von dieser Person zusammenkommt –
+    // schon Hochgeladenes wird mitgerechnet.
+    MB_PRO_TAG: 900
+  },
 
   // Räumt beim Öffnen der Seite die eigenen abgelaufenen Videos weg.
   //
@@ -517,6 +552,7 @@ const el = {
   composer:  document.getElementById('composer'),
   cTitel:    document.getElementById('composer-titel'),
   cListe:    document.getElementById('composer-liste'),
+  cUrteil:   document.getElementById('composer-urteil'),
   leiste:    document.getElementById('wochenleiste'),
   titel:     document.getElementById('wochentitel'),
   dran:      document.getElementById('dran'),
@@ -656,15 +692,25 @@ async function angemeldet() {
  * Projekt-Konten geprüft.
  */
 async function zeigeKonto() {
+  let frei = null;
+
   try {
-    const info = await drive('about', { fields: 'user(emailAddress)' });
+    const info = await drive('about', {
+      fields: 'user(emailAddress),storageQuota(limit,usage)'
+    });
     meineMail = (info.user && info.user.emailAddress) || '';
+
+    const q = info.storageQuota;
+    if (q && q.limit) {
+      frei = (Number(q.limit) - Number(q.usage)) / 1073741824;
+    }
   } catch (e) {
     return true;   // ohne Auskunft lieber weitermachen als blockieren
   }
   if (!meineMail) return true;
 
-  el.konto.textContent = meineMail;
+  el.konto.textContent = meineMail
+    + (frei === null ? '' : ' · ' + frei.toFixed(1).replace('.', ',') + ' GB frei');
 
   if (CONFIG.KONTEN.length && CONFIG.KONTEN.indexOf(meineMail) === -1) {
     // Nicht merken – sonst schlägt die Seite beim nächsten Mal
@@ -680,6 +726,17 @@ async function zeigeKonto() {
   merkeKonto(meineMail);
   el.konto.classList.remove('falsch');
   el.bereich.hidden = false;
+
+  // Ein volles Konto lässt Uploads scheitern – lieber vorher sagen,
+  // als mitten im Hochladen eine kryptische Fehlermeldung zu zeigen.
+  if (frei !== null && frei < CONFIG.SPEICHER_WARNUNG_GB) {
+    el.konto.classList.add('falsch');
+    zeigeFehler('Nur noch ' + frei.toFixed(1).replace('.', ',')
+      + ' GB frei in ' + meineMail + '.\n'
+      + 'Hochladen kann fehlschlagen. Entweder in Drive aufräumen '
+      + 'oder ein anderes Projekt-Konto benutzen.');
+  }
+
   return true;
 }
 
@@ -1451,6 +1508,57 @@ el.datei.onchange = function () {
   zeichneEntwurf();
 };
 
+/**
+ * Prüft eine einzelne Datei gegen die Grenzen. Auflösung und Länge
+ * stehen erst zur Verfügung, wenn der Browser die Datei kurz
+ * angelesen hat – bis dahin bleibt die Liste leer.
+ */
+function problemeVon(eintrag) {
+  const g = CONFIG.GRENZEN;
+  const probleme = [];
+
+  if (g.MB_PRO_DATEI && eintrag.size > g.MB_PRO_DATEI * 1048576) {
+    probleme.push('zu groß (max. ' + g.MB_PRO_DATEI + ' MB)');
+  }
+  if (g.KURZE_SEITE && eintrag.breite) {
+    const kurz = Math.min(eintrag.breite, eintrag.hoehe);
+    if (kurz > g.KURZE_SEITE) {
+      probleme.push('zu hohe Auflösung (' + eintrag.breite + '×' + eintrag.hoehe
+                  + ') – bitte in 1080p aufnehmen');
+    }
+  }
+  if (g.MINUTEN_PRO_CLIP && eintrag.dauer
+      && eintrag.dauer > g.MINUTEN_PRO_CLIP * 60) {
+    probleme.push('zu lang (' + Math.round(eintrag.dauer / 60)
+                + ' Min., max. ' + g.MINUTEN_PRO_CLIP + ')');
+  }
+  return probleme;
+}
+
+/** Wie viel liegt an diesem Tag schon von dieser Person in Drive? */
+function bereitsAnDiesemTag() {
+  const ordnerId = el.person.value;
+  const ordner = unterordner.find(function (o) { return o.id === ordnerId; });
+  if (!ordner) return 0;
+
+  const tag = schluessel(plusTage(new Date(), -Number(el.fuer.value || 0)));
+  return dateien
+    .filter(function (d) { return d.tagSchluessel === tag && d.ordner === ordner.name; })
+    .reduce(function (summe, d) { return summe + (Number(d.size) || 0); }, 0);
+}
+
+function tagesProblem() {
+  const grenze = CONFIG.GRENZEN.MB_PRO_TAG;
+  if (!grenze) return null;
+
+  const neu = entwurf.reduce(function (s, e) { return s + e.size; }, 0);
+  const gesamt = bereitsAnDiesemTag() + neu;
+
+  if (gesamt <= grenze * 1048576) return null;
+  return 'Zusammen ' + mb(gesamt) + ' MB an diesem Tag – erlaubt sind '
+       + grenze + ' MB. Bitte ein paar Clips entfernen.';
+}
+
 function zeichneEntwurf() {
   el.composer.hidden = entwurf.length === 0;
   if (!entwurf.length) return;
@@ -1473,12 +1581,22 @@ function zeichneEntwurf() {
     mini.className = 'mini';
     if (eintrag.mimeType.indexOf('video/') === 0) {
       // Ein stummes Video zeigt seinen ersten Frame – billiger,
-      // als selbst ein Standbild zu berechnen.
+      // als selbst ein Standbild zu berechnen. Nebenbei verrät es
+      // Auflösung und Länge, ohne dass etwas hochgeladen wird.
       const v = document.createElement('video');
       v.src = eintrag.url + '#t=0.1';
       v.muted = true;
       v.playsInline = true;
       v.preload = 'metadata';
+      if (!eintrag.gemessen) {
+        v.onloadedmetadata = function () {
+          eintrag.gemessen = true;
+          eintrag.breite = v.videoWidth;
+          eintrag.hoehe = v.videoHeight;
+          eintrag.dauer = v.duration;
+          zeichneEntwurf();
+        };
+      }
       mini.appendChild(v);
     } else {
       const img = document.createElement('img');
@@ -1488,13 +1606,29 @@ function zeichneEntwurf() {
     }
     li.appendChild(mini);
 
+    const probleme = problemeVon(eintrag);
+    if (probleme.length) li.classList.add('beanstandet');
+
     const text = document.createElement('div');
     text.className = 'beschriftung';
+
+    let details = mb(eintrag.size) + ' MB';
+    if (eintrag.mimeType.indexOf('video/') === 0) {
+      if (eintrag.breite) {
+        details += ' · ' + eintrag.breite + '×' + eintrag.hoehe;
+      }
+      if (eintrag.dauer) {
+        details += ' · ' + Math.round(eintrag.dauer) + ' Sek.';
+      }
+    } else {
+      details += ' · Bild, ' + CONFIG.BILD_SEKUNDEN + ' Sek.';
+    }
+
     text.innerHTML = '<div class="dateiname">' + escape_(eintrag.name) + '</div>'
-      + '<div class="klein">' + mb(eintrag.size) + ' MB · '
-      + (eintrag.mimeType.indexOf('video/') === 0
-          ? 'Video' : 'Bild, ' + CONFIG.BILD_SEKUNDEN + ' Sek.')
-      + '</div>';
+      + '<div class="klein">' + details + '</div>'
+      + (probleme.length
+          ? '<div class="beanstandung">' + escape_(probleme.join(', ')) + '</div>'
+          : '');
     li.appendChild(text);
 
     const knoepfe = document.createElement('div');
@@ -1526,6 +1660,24 @@ function zeichneEntwurf() {
     li.appendChild(knoepfe);
     el.cListe.appendChild(li);
   });
+
+  // ---- Gesamturteil ----
+  const beanstandet = entwurf.filter(function (e) {
+    return problemeVon(e).length;
+  }).length;
+  const tagProblem = tagesProblem();
+
+  let hinweis = '';
+  if (beanstandet) {
+    hinweis = beanstandet === 1
+      ? 'Eine Datei hält die Grenzen nicht ein.'
+      : beanstandet + ' Dateien halten die Grenzen nicht ein.';
+  }
+  if (tagProblem) hinweis += (hinweis ? ' ' : '') + tagProblem;
+
+  el.cUrteil.textContent = hinweis;
+  el.cUrteil.hidden = !hinweis;
+  document.getElementById('absenden').disabled = beanstandet > 0 || !!tagProblem;
 }
 
 function tausche(a, b) {
@@ -1690,7 +1842,9 @@ function fuellePersonen() {
   if (vorher) el.person.value = vorher;
 }
 
-el.person.onchange = merkePerson;
+// Person oder Tag zu wechseln ändert das Tageslimit – neu prüfen.
+el.person.onchange = function () { merkePerson(); zeichneEntwurf(); };
+el.fuer.onchange = function () { zeichneEntwurf(); };
 
 function merkePerson() {
   try { localStorage.setItem('videotagebuch.person', el.person.value); } catch (e) {}
