@@ -349,6 +349,7 @@
     .tagzeile { gap: .7rem; }
   }
 
+  #aufgeraeumt { font-size: .8rem; color: var(--grau); margin: 0 0 1rem; }
   #konto { font-size: .75rem; color: var(--blass); }
   #konto.falsch { color: #8c2f22; }
   #status { color: var(--grau); }
@@ -407,6 +408,7 @@
 </section>
 
 <div id="fehler" hidden></div>
+<p id="aufgeraeumt" hidden></p>
 <p id="status">Nicht angemeldet.</p>
 
 <nav id="wochenleiste" hidden>
@@ -461,15 +463,19 @@ const CONFIG = {
   // Erster Tag des Zyklus – an diesem Tag ist der erste Name dran.
   ZYKLUS_START: '2026-08-10',
 
-  // Die Projekt-Konten. Meldet sich jemand mit einem anderen Konto
-  // an – etwa versehentlich mit dem privaten – warnt die Seite.
-  // Sonst gehörte das Video diesem Konto, zählte gegen dessen
-  // Speicher, und das Aufräumskript käme nie daran.
-  // Leer lassen schaltet die Prüfung ab.
-  KONTEN: [
-    'speicherplatzfurvlogs@gmail.com',
-    'auskunftgesucht@gmail.com'
-  ],
+  // Erlaubte Konten. Leer lassen heißt: jeder, der Zugriff auf den
+  // geteilten Ordner hat, darf mitmachen – das ist die einfachere
+  // Variante, weil die Freigabe in Drive dann die einzige Liste ist,
+  // die du pflegen musst.
+  KONTEN: [],
+
+  // Räumt beim Öffnen der Seite die eigenen abgelaufenen Videos weg.
+  //
+  // Löschen darf in Drive nur, wem die Datei gehört. Da jeder mit
+  // seinem eigenen Konto hochlädt, kann auch nur sein Browser seine
+  // eigenen Videos entfernen – deshalb macht die Seite es und nicht
+  // ein zentrales Skript. Fremde Dateien werden nie angefasst.
+  AUTO_LOESCHEN: true,
 
   // Vollzugriff auf Drive. Der eingeschränkte Bereich drive.file
   // dürfte nur Dateien anfassen, die die App selbst angelegt hat –
@@ -488,6 +494,7 @@ let token = null;
 let tokenClient = null;
 let unterordner = [];
 let dateien = [];
+let meineMail = '';
 let wochenStart = montagVon(new Date());
 let ansicht = 'zeitleiste';   // oder 'woche'
 
@@ -498,6 +505,7 @@ const el = {
   ansicht:   document.getElementById('ansicht'),
   neuladen:  document.getElementById('neuladen'),
   status:    document.getElementById('status'),
+  aufgeraeumt: document.getElementById('aufgeraeumt'),
   fehler:    document.getElementById('fehler'),
   bereich:   document.getElementById('hochladen-bereich'),
   person:    document.getElementById('person'),
@@ -635,13 +643,12 @@ function gemerktesKonto() {
   try { return localStorage.getItem('videotagebuch.konto') || ''; } catch (e) { return ''; }
 }
 
-function angemeldet() {
+async function angemeldet() {
   el.anmelden.hidden = true;
   el.neuladen.hidden = false;
   el.ansicht.hidden = false;
-  el.bereich.hidden = false;
-  laden();
-  zeigeKonto();
+  el.wechseln.hidden = false;
+  if (await zeigeKonto()) laden();
 }
 
 /**
@@ -651,31 +658,29 @@ function angemeldet() {
 async function zeigeKonto() {
   try {
     const info = await drive('about', { fields: 'user(emailAddress)' });
-    const mail = info.user && info.user.emailAddress;
-    if (!mail) return;
+    meineMail = (info.user && info.user.emailAddress) || '';
+  } catch (e) {
+    return true;   // ohne Auskunft lieber weitermachen als blockieren
+  }
+  if (!meineMail) return true;
 
-    el.konto.textContent = mail;
-    el.wechseln.hidden = false;
+  el.konto.textContent = meineMail;
 
-    const geprueft = CONFIG.KONTEN.length === 0
-      || CONFIG.KONTEN.indexOf(mail) !== -1;
+  if (CONFIG.KONTEN.length && CONFIG.KONTEN.indexOf(meineMail) === -1) {
+    // Nicht merken – sonst schlägt die Seite beim nächsten Mal
+    // wieder dasselbe falsche Konto vor.
+    el.konto.classList.add('falsch');
+    el.bereich.hidden = true;
+    zeigeFehler('Du bist als ' + meineMail + ' angemeldet.\n'
+      + 'Dieses Konto gehört nicht zum Projekt.\n\n'
+      + 'Bitte oben auf "Konto wechseln" gehen.');
+    return false;
+  }
 
-    if (geprueft) {
-      merkeKonto(mail);
-      el.konto.classList.remove('falsch');
-      el.bereich.hidden = false;
-    } else {
-      // Nicht merken – sonst schlägt die Seite beim nächsten Mal
-      // wieder dasselbe falsche Konto vor.
-      el.konto.classList.add('falsch');
-      el.bereich.hidden = true;
-      zeigeFehler('Du bist als ' + mail + ' angemeldet.\n'
-        + 'Das ist kein Projekt-Konto – hochgeladene Videos würden '
-        + 'gegen deinen privaten Speicher zählen und nach 30 Tagen '
-        + 'nicht gelöscht werden.\n\n'
-        + 'Bitte oben auf "Konto wechseln" gehen.');
-    }
-  } catch (e) {}
+  merkeKonto(meineMail);
+  el.konto.classList.remove('falsch');
+  el.bereich.hidden = false;
+  return true;
 }
 
 window.onload = function () {
@@ -826,7 +831,8 @@ async function dateienHolen() {
     const inhalt = await drive('files', {
       q: "'" + ordner.id + "' in parents"
          + " and mimeType!='application/vnd.google-apps.folder' and trashed=false",
-      fields: 'files(id,name,mimeType,createdTime,size,thumbnailLink)',
+      fields: 'files(id,name,mimeType,createdTime,size,thumbnailLink,'
+            + 'owners(emailAddress),capabilities(canDelete))',
       orderBy: 'createdTime desc',
       pageSize: 200
     });
@@ -848,11 +854,70 @@ async function laden() {
     unterordner = await ordnerHolen();
     fuellePersonen();
     dateien = await dateienHolen();
+
+    if (CONFIG.AUTO_LOESCHEN) await aufraeumen();
+
     el.status.hidden = true;
     zeichne();
   } catch (fehler) {
     el.status.hidden = true;
     zeigeFehler(fehler.message);
+  }
+}
+
+
+// ============ AUFRÄUMEN ============
+
+/**
+ * Entfernt die eigenen abgelaufenen Videos endgültig.
+ *
+ * Vier Bedingungen müssen zusammenkommen, sonst passiert nichts:
+ *   – die Datei gehört dem angemeldeten Konto
+ *   – Drive bestätigt selbst, dass gelöscht werden darf
+ *   – sie liegt im Projektordner (etwas anderes lädt die Seite nie)
+ *   – sie ist älter als die Aufbewahrungszeit
+ *
+ * Maßgeblich ist der echte Upload-Zeitpunkt, nicht das Datum im
+ * Dateinamen. Ein nachgereichtes Video verschwindet dadurch nicht
+ * sofort, nur weil es einen älteren Tag beschreibt.
+ *
+ * Endgültig statt Papierkorb: Der Papierkorb belegt weiter Speicher.
+ */
+async function aufraeumen() {
+  const grenze = Date.now() - CONFIG.AUFBEWAHRUNG_TAGE * 86400000;
+
+  const abgelaufen = dateien.filter(function (d) {
+    const meins = d.owners
+      && d.owners.some(function (o) { return o.emailAddress === meineMail; });
+    const darf = !d.capabilities || d.capabilities.canDelete !== false;
+    return meins && darf && new Date(d.createdTime).getTime() < grenze;
+  });
+
+  if (!abgelaufen.length) return;
+
+  el.status.hidden = false;
+  el.status.textContent = 'Räume ' + abgelaufen.length + ' abgelaufene auf …';
+
+  const geloescht = [];
+
+  for (const datei of abgelaufen) {
+    try {
+      const antwort = await fetch(
+        'https://www.googleapis.com/drive/v3/files/' + datei.id,
+        { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } }
+      );
+      if (antwort.ok || antwort.status === 404) geloescht.push(datei.id);
+    } catch (e) { /* beim nächsten Öffnen erneut versuchen */ }
+  }
+
+  if (geloescht.length) {
+    dateien = dateien.filter(function (d) {
+      return geloescht.indexOf(d.id) === -1;
+    });
+    el.aufgeraeumt.textContent = geloescht.length === 1
+      ? 'Ein abgelaufenes Video wurde gelöscht.'
+      : geloescht.length + ' abgelaufene Videos wurden gelöscht.';
+    el.aufgeraeumt.hidden = false;
   }
 }
 

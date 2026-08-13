@@ -117,8 +117,60 @@ Wer in 1080p statt 4K aufnimmt, wartet ein Fünftel so lang.
 
 ---
 
+---
+
+## Eine Person hinzufügen
+
+Drei Schritte, mehr nicht:
+
+1. **Unterordner anlegen** im geteilten Ordner, Name enthält den
+   Vornamen: `03-joshua`. Die Seite ordnet über diesen Namen zu.
+2. **Freigeben:** Hauptordner mit der Google-Adresse der Person teilen,
+   Rolle *Bearbeiter*.
+3. **Als Testnutzer eintragen** in der Cloud Console unter
+   *Google Auth Platform → Audience → Test users*.
+
+Dazu in `index.html` den Namen in `CONFIG.REIHENFOLGE` ergänzen und
+`ZYKLUS_START` auf den Montag setzen, ab dem die neue Reihenfolge gilt.
+
+> Vergisst du Schritt 3, meldet Google „Zugriff blockiert".
+> Vergisst du den Ordner, steht im Tagesfeld „noch kein Ordner angelegt".
+
+**Eigene Projekt-Konten sind nicht nötig.** Jeder meldet sich mit dem
+Google-Konto an, das er ohnehin benutzt. Durch die Rotation ist jeder
+nur alle acht Tage dran – das sind rund 1,5 GB von seinen 15 GB, und
+es wächst nicht, weil nach 30 Tagen dieselbe Menge wieder abfließt.
+
+---
+
+## Wie das Löschen funktioniert
+
+In Drive darf nur löschen, wem eine Datei gehört. Da jeder mit seinem
+eigenen Konto hochlädt, kann kein zentrales Skript aufräumen – deshalb
+macht es die Seite: Beim Öffnen entfernt sie **die eigenen** Videos,
+die älter als 30 Tage sind, endgültig und ohne Umweg über den
+Papierkorb (der belegt weiter Speicher).
+
+Fremde Dateien werden nie angefasst. Vier Bedingungen müssen dafür
+zusammenkommen: Die Datei gehört dem angemeldeten Konto, Drive selbst
+bestätigt das Löschrecht, sie liegt im Projektordner, und sie ist
+älter als die Aufbewahrungszeit.
+
+Maßgeblich ist der echte Upload-Zeitpunkt, nicht das Datum im
+Dateinamen – ein nachgereichtes Video verschwindet also nicht sofort.
+
+Abschalten lässt sich das mit `AUTO_LOESCHEN: false` in `CONFIG`.
+
+> Der Nebeneffekt: Wer die Seite monatelang nicht öffnet, dessen alte
+> Videos bleiben liegen. Sie tauchen in der Ansicht nicht mehr auf,
+> belegen aber weiter Platz in seinem Drive. In der Praxis öffnet die
+> Seite jeder, der hochlädt.
+
+---
+
 ## Was die Seite bewusst nicht kann
 
-- **Nichts hochladen.** Kommt in der nächsten Ausbaustufe.
-- **Nichts löschen.** Der Zugriff ist ausdrücklich nur lesend.
-  Aufgeräumt wird weiterhin vom Apps Script in jedem Konto.
+- **Fremde Videos löschen.** Technisch von Drive verhindert, und gut so.
+- **Videos kürzen oder zusammenfügen.** Das bräuchte ffmpeg im Browser:
+  30 MB Download und mehrere Minuten Rechnen auf dem Handy. Kürzen geht
+  in der Handy-Galerie vor dem Hochladen.
