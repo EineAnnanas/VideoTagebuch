@@ -349,6 +349,7 @@
     .tagzeile { gap: .7rem; }
   }
 
+  #konto { font-size: .75rem; color: var(--blass); }
   #status { color: var(--grau); }
   #fehler {
     color: #8c2f22;
@@ -371,6 +372,7 @@
   <button id="ansicht" class="leise" hidden>Wochenraster</button>
   <button id="neuladen" class="leise" hidden>Neu laden</button>
   <button id="handyknopf" class="leise">Handy-Ansicht</button>
+  <span id="konto"></span>
 </header>
 
 <div id="hochladen-bereich" hidden>
@@ -479,6 +481,7 @@ let ansicht = 'zeitleiste';   // oder 'woche'
 
 const el = {
   anmelden:  document.getElementById('anmelden'),
+  konto:     document.getElementById('konto'),
   ansicht:   document.getElementById('ansicht'),
   neuladen:  document.getElementById('neuladen'),
   status:    document.getElementById('status'),
@@ -588,6 +591,58 @@ function nachName(a, b) {
 
 // ============ ANMELDUNG ============
 
+/**
+ * Der Zugang von Google gilt eine Stunde. Ihn im Tab zu behalten
+ * erspart die Anmeldung beim Neuladen der Seite. sessionStorage
+ * und nicht localStorage: beim Schließen des Tabs ist er weg.
+ */
+function merkeZugang(antwort) {
+  try {
+    sessionStorage.setItem('videotagebuch.zugang', JSON.stringify({
+      token: antwort.access_token,
+      bis: Date.now() + (Number(antwort.expires_in || 3600) - 120) * 1000
+    }));
+  } catch (e) {}
+}
+
+function gemerkterZugang() {
+  try {
+    const roh = sessionStorage.getItem('videotagebuch.zugang');
+    if (!roh) return null;
+    const z = JSON.parse(roh);
+    return z.bis > Date.now() ? z.token : null;
+  } catch (e) { return null; }
+}
+
+/** Zuletzt benutztes Konto – erspart Google die Kontoauswahl. */
+function merkeKonto(mail) {
+  try { localStorage.setItem('videotagebuch.konto', mail); } catch (e) {}
+}
+function gemerktesKonto() {
+  try { return localStorage.getItem('videotagebuch.konto') || ''; } catch (e) { return ''; }
+}
+
+function angemeldet() {
+  el.anmelden.hidden = true;
+  el.neuladen.hidden = false;
+  el.ansicht.hidden = false;
+  el.bereich.hidden = false;
+  laden();
+  zeigeKonto();
+}
+
+/** Fragt Drive, wer gerade angemeldet ist – nur zur Anzeige. */
+async function zeigeKonto() {
+  try {
+    const info = await drive('about', { fields: 'user(emailAddress)' });
+    const mail = info.user && info.user.emailAddress;
+    if (mail) {
+      merkeKonto(mail);
+      el.konto.textContent = mail;
+    }
+  } catch (e) {}
+}
+
 window.onload = function () {
   if (CONFIG.CLIENT_ID.indexOf('apps.googleusercontent.com') === -1) {
     zeigeFehler('Es ist noch keine CLIENT_ID eingetragen. Siehe README.md.');
@@ -602,19 +657,24 @@ window.onload = function () {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CONFIG.CLIENT_ID,
       scope: CONFIG.BEREICH,
+      hint: gemerktesKonto(),
       callback: function (antwort) {
         if (antwort.error) {
           zeigeFehler('Anmeldung fehlgeschlagen: ' + antwort.error);
           return;
         }
         token = antwort.access_token;
-        el.anmelden.hidden = true;
-        el.neuladen.hidden = false;
-        el.ansicht.hidden = false;
-        el.bereich.hidden = false;
-        laden();
+        merkeZugang(antwort);
+        angemeldet();
       }
     });
+
+    // Noch gültiger Zugang aus dieser Sitzung? Dann ohne Klick weiter.
+    const alt = gemerkterZugang();
+    if (alt) {
+      token = alt;
+      angemeldet();
+    }
   }, 100);
 };
 
