@@ -350,6 +350,7 @@
   }
 
   #konto { font-size: .75rem; color: var(--blass); }
+  #konto.falsch { color: #8c2f22; }
   #status { color: var(--grau); }
   #fehler {
     color: #8c2f22;
@@ -371,6 +372,7 @@
   <button id="anmelden" class="wichtig">Mit Google anmelden</button>
   <button id="ansicht" class="leise" hidden>Wochenraster</button>
   <button id="neuladen" class="leise" hidden>Neu laden</button>
+  <button id="wechseln" class="leise" hidden>Konto wechseln</button>
   <button id="handyknopf" class="leise">Handy-Ansicht</button>
   <span id="konto"></span>
 </header>
@@ -459,6 +461,16 @@ const CONFIG = {
   // Erster Tag des Zyklus – an diesem Tag ist der erste Name dran.
   ZYKLUS_START: '2026-08-10',
 
+  // Die Projekt-Konten. Meldet sich jemand mit einem anderen Konto
+  // an – etwa versehentlich mit dem privaten – warnt die Seite.
+  // Sonst gehörte das Video diesem Konto, zählte gegen dessen
+  // Speicher, und das Aufräumskript käme nie daran.
+  // Leer lassen schaltet die Prüfung ab.
+  KONTEN: [
+    'speicherplatzfurvlogs@gmail.com',
+    'auskunftgesucht@gmail.com'
+  ],
+
   // Vollzugriff auf Drive. Der eingeschränkte Bereich drive.file
   // dürfte nur Dateien anfassen, die die App selbst angelegt hat –
   // dann sähe niemand die Videos der anderen.
@@ -482,6 +494,7 @@ let ansicht = 'zeitleiste';   // oder 'woche'
 const el = {
   anmelden:  document.getElementById('anmelden'),
   konto:     document.getElementById('konto'),
+  wechseln:  document.getElementById('wechseln'),
   ansicht:   document.getElementById('ansicht'),
   neuladen:  document.getElementById('neuladen'),
   status:    document.getElementById('status'),
@@ -631,14 +644,36 @@ function angemeldet() {
   zeigeKonto();
 }
 
-/** Fragt Drive, wer gerade angemeldet ist – nur zur Anzeige. */
+/**
+ * Wer ist gerade angemeldet? Wird angezeigt und gegen die Liste der
+ * Projekt-Konten geprüft.
+ */
 async function zeigeKonto() {
   try {
     const info = await drive('about', { fields: 'user(emailAddress)' });
     const mail = info.user && info.user.emailAddress;
-    if (mail) {
+    if (!mail) return;
+
+    el.konto.textContent = mail;
+    el.wechseln.hidden = false;
+
+    const geprueft = CONFIG.KONTEN.length === 0
+      || CONFIG.KONTEN.indexOf(mail) !== -1;
+
+    if (geprueft) {
       merkeKonto(mail);
-      el.konto.textContent = mail;
+      el.konto.classList.remove('falsch');
+      el.bereich.hidden = false;
+    } else {
+      // Nicht merken – sonst schlägt die Seite beim nächsten Mal
+      // wieder dasselbe falsche Konto vor.
+      el.konto.classList.add('falsch');
+      el.bereich.hidden = true;
+      zeigeFehler('Du bist als ' + mail + ' angemeldet.\n'
+        + 'Das ist kein Projekt-Konto – hochgeladene Videos würden '
+        + 'gegen deinen privaten Speicher zählen und nach 30 Tagen '
+        + 'nicht gelöscht werden.\n\n'
+        + 'Bitte oben auf "Konto wechseln" gehen.');
     }
   } catch (e) {}
 }
@@ -660,9 +695,14 @@ window.onload = function () {
       hint: gemerktesKonto(),
       callback: function (antwort) {
         if (antwort.error) {
-          zeigeFehler('Anmeldung fehlgeschlagen: ' + antwort.error);
+          // Bei der stillen Anmeldung ist ein Fehlschlag normal
+          if (!leiseAnmeldung) {
+            zeigeFehler('Anmeldung fehlgeschlagen: ' + antwort.error);
+          }
+          leiseAnmeldung = false;
           return;
         }
+        leiseAnmeldung = false;
         token = antwort.access_token;
         merkeZugang(antwort);
         angemeldet();
@@ -674,11 +714,46 @@ window.onload = function () {
     if (alt) {
       token = alt;
       angemeldet();
+      return;
     }
+
+    // Sonst still versuchen: Ist der Browser noch bei Google
+    // angemeldet und die Zustimmung bereits erteilt, kommt der
+    // neue Schlüssel ohne jede Abfrage zurück.
+    if (gemerktesKonto()) stillAnmelden();
   }, 100);
 };
 
+/**
+ * Anmeldung ohne Nachfrage. Klappt das nicht – etwa weil der
+ * Browser das Fenster blockiert oder die Google-Sitzung abgelaufen
+ * ist – bleibt einfach der Anmeldeknopf stehen. Deshalb wird hier
+ * kein Fehler angezeigt.
+ */
+function stillAnmelden() {
+  leiseAnmeldung = true;
+  try {
+    tokenClient.requestAccessToken({ prompt: '' });
+  } catch (e) {
+    leiseAnmeldung = false;
+  }
+  setTimeout(function () { leiseAnmeldung = false; }, 4000);
+}
+
+let leiseAnmeldung = false;
+
 el.anmelden.onclick = function () { tokenClient.requestAccessToken(); };
+
+/** Erzwingt Googles Kontoauswahl, statt das letzte Konto zu nehmen. */
+el.wechseln.onclick = function () {
+  token = null;
+  try {
+    sessionStorage.removeItem('videotagebuch.zugang');
+    localStorage.removeItem('videotagebuch.konto');
+  } catch (e) {}
+  el.fehler.hidden = true;
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
+};
 el.neuladen.onclick = function () { laden(); };
 
 el.ansicht.onclick = function () {
@@ -718,9 +793,13 @@ async function drive(pfad, params) {
   const antwort = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
 
   if (antwort.status === 401) {
+    // Schlüssel abgelaufen – still einen neuen holen. Ist der
+    // Browser noch bei Google angemeldet, merkt der Nutzer nichts.
     token = null;
-    tokenClient.requestAccessToken({ prompt: '' });
-    throw new Error('Sitzung abgelaufen. Bitte noch einmal anmelden.');
+    try { sessionStorage.removeItem('videotagebuch.zugang'); } catch (e) {}
+    stillAnmelden();
+    throw new Error('Der Zugang ist abgelaufen. Wird erneuert – '
+                  + 'falls nichts passiert, bitte noch einmal anmelden.');
   }
   if (!antwort.ok) {
     throw new Error('Drive antwortete mit ' + antwort.status + ':\n' + (await antwort.text()));
