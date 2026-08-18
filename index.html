@@ -338,6 +338,52 @@
   #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .85rem; }
   #overlay .ersatz p { color: var(--grau); }
 
+  /* ---- Kommentare ---- */
+  .kommentare {
+    border-top: 1px solid var(--rand);
+    padding: .8rem;
+  }
+  .kommentare h3 {
+    font-family: var(--serif);
+    font-size: .95rem;
+    font-weight: normal;
+    margin: 0 0 .7rem;
+  }
+  .kommentar { margin-bottom: .8rem; font-size: .85rem; }
+  .kommentar .kopf {
+    display: flex;
+    align-items: baseline;
+    gap: .45rem;
+  }
+  .kommentar .autor { font-weight: 600; font-size: .82rem; }
+  .kommentar .wann { font-size: .72rem; color: var(--blass); }
+  .kommentar .loeschen {
+    margin-left: auto;
+    padding: .1rem .35rem;
+    min-height: 0;
+    font-size: .7rem;
+  }
+  .kommentar .inhalt { white-space: pre-wrap; }
+
+  .kommentarform { display: flex; gap: .45rem; align-items: flex-start; }
+  .kommentarform textarea {
+    font: inherit;
+    font-size: .85rem;
+    flex: 1 1 auto;
+    min-height: 38px;
+    padding: .5rem;
+    border: 1px solid var(--rand);
+    border-radius: 6px;
+    background: var(--flaeche);
+    color: var(--text);
+    resize: vertical;
+  }
+  .kommentarform textarea:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 1px;
+  }
+  .kommentare .leerhinweis { font-size: .8rem; color: var(--blass); margin-bottom: .7rem; }
+
   /* ---- Handy-Vorschau ---- */
   body.handy {
     max-width: 390px;
@@ -1372,6 +1418,8 @@ async function zeigeClip() {
     el.overlayIn.appendChild(anzeige);
     el.overlayIn.appendChild(spielLeiste(datei, url));
 
+    if (!datei.vorschau) el.overlayIn.appendChild(kommentarbereich(datei));
+
     vorladen();
 
   } catch (fehler) {
@@ -1439,6 +1487,199 @@ function spielLeiste(datei, url) {
 
   return l;
 }
+
+// ============ KOMMENTARE ============
+//
+// Drive kann zu jeder Datei Kommentare speichern – dieselbe
+// Schnittstelle, die wir ohnehin benutzen. Vorteile: kein zusätzlicher
+// Speicher, keine Konflikte, wenn zwei gleichzeitig schreiben, und die
+// Kommentare verschwinden nach 30 Tagen zusammen mit dem Video.
+//
+// Ein Haken: Alle benutzen dasselbe Projekt-Konto, also stünde bei
+// jedem Kommentar derselbe Verfasser. Deshalb wird der Name aus der
+// "Ich bin"-Auswahl vorangestellt und beim Anzeigen wieder abgetrennt.
+
+/** Name aus der Auswahl, ohne die Nummer davor: "02-lennart" → "lennart" */
+function meinName() {
+  const gewaehlt = el.person.options[el.person.selectedIndex];
+  if (!gewaehlt || !gewaehlt.value) return '';
+  return gewaehlt.textContent.replace(/^\s*\d+\s*[-_.]?\s*/, '').trim();
+}
+
+function kommentarbereich(datei) {
+  const kasten = document.createElement('div');
+  kasten.className = 'kommentare';
+  kasten.innerHTML = '<h3>Kommentare</h3>'
+                   + '<div class="leerhinweis">lädt …</div>';
+
+  const liste = document.createElement('div');
+  kasten.appendChild(liste);
+
+  const form = document.createElement('div');
+  form.className = 'kommentarform';
+
+  const feld = document.createElement('textarea');
+  feld.rows = 1;
+  feld.placeholder = meinName()
+    ? 'Kommentieren als ' + meinName() + ' …'
+    : 'Oben bei "Ich bin" auswählen, wer du bist';
+  form.appendChild(feld);
+
+  const senden = document.createElement('button');
+  senden.className = 'wichtig';
+  senden.textContent = 'Senden';
+  form.appendChild(senden);
+
+  senden.onclick = async function () {
+    const text = feld.value.trim();
+    if (!text) return;
+
+    senden.disabled = true;
+    try {
+      await kommentarSchreiben(datei, text);
+      feld.value = '';
+      await kommentareZeigen(datei, kasten, liste);
+    } catch (fehler) {
+      zeigeFehler(fehler.message);
+    } finally {
+      senden.disabled = false;
+    }
+  };
+
+  // Enter sendet, Umschalt+Enter macht einen Zeilenumbruch
+  feld.onkeydown = function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      senden.click();
+    }
+  };
+
+  kasten.appendChild(form);
+  kommentareZeigen(datei, kasten, liste);
+  return kasten;
+}
+
+async function kommentareHolen(datei) {
+  const url = new URL('https://www.googleapis.com/drive/v3/files/'
+                    + datei.id + '/comments');
+  url.searchParams.set('fields',
+    'comments(id,content,createdTime,author(displayName))');
+  url.searchParams.set('pageSize', '100');
+
+  const antwort = await fetch(url, {
+    headers: { Authorization: 'Bearer ' + token }
+  });
+  if (!antwort.ok) throw new Error('Kommentare konnten nicht geladen werden.');
+  return (await antwort.json()).comments || [];
+}
+
+async function kommentarSchreiben(datei, text) {
+  const name = meinName();
+  if (!name) {
+    throw new Error('Bitte oben bei "Ich bin" auswählen, wer du bist – '
+                  + 'sonst steht bei allen derselbe Name.');
+  }
+
+  const antwort = await fetch(
+    'https://www.googleapis.com/drive/v3/files/' + datei.id
+      + '/comments?fields=id',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ content: name + ': ' + text })
+    }
+  );
+  if (!antwort.ok) {
+    throw new Error('Kommentar konnte nicht gespeichert werden ('
+                  + antwort.status + ').');
+  }
+}
+
+async function kommentarLoeschen(datei, id) {
+  await fetch('https://www.googleapis.com/drive/v3/files/' + datei.id
+            + '/comments/' + id,
+    { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+}
+
+async function kommentareZeigen(datei, kasten, liste) {
+  const hinweis = kasten.querySelector('.leerhinweis');
+
+  let kommentare;
+  try {
+    kommentare = await kommentareHolen(datei);
+  } catch (fehler) {
+    hinweis.textContent = fehler.message;
+    return;
+  }
+
+  liste.innerHTML = '';
+
+  if (!kommentare.length) {
+    hinweis.textContent = 'Noch keine Kommentare.';
+    hinweis.hidden = false;
+    return;
+  }
+  hinweis.hidden = true;
+
+  kommentare
+    .sort(function (a, b) {
+      return new Date(a.createdTime) - new Date(b.createdTime);
+    })
+    .forEach(function (k) {
+      liste.appendChild(kommentarZeile(datei, k, kasten, liste));
+    });
+}
+
+function kommentarZeile(datei, k, kasten, liste) {
+  const zeile = document.createElement('div');
+  zeile.className = 'kommentar';
+
+  // "lennart: text" wieder auseinandernehmen
+  const treffer = /^([^:\n]{1,24}):\s*([\s\S]*)$/.exec(k.content || '');
+  const autor = treffer ? treffer[1] : (k.author && k.author.displayName) || '?';
+  const text  = treffer ? treffer[2] : (k.content || '');
+
+  const kopf = document.createElement('div');
+  kopf.className = 'kopf';
+  kopf.innerHTML = '<span class="autor">' + escape_(autor) + '</span>'
+                 + '<span class="wann">' + wannText(k.createdTime) + '</span>';
+
+  // Löschen nur beim eigenen Namen – bei einem geteilten Konto ist der
+  // vorangestellte Name das Einzige, woran man den Verfasser erkennt.
+  if (meinName() && autor.toLowerCase() === meinName().toLowerCase()) {
+    const weg = document.createElement('button');
+    weg.className = 'loeschen leise';
+    weg.textContent = 'löschen';
+    weg.onclick = async function () {
+      weg.disabled = true;
+      await kommentarLoeschen(datei, k.id);
+      await kommentareZeigen(datei, kasten, liste);
+    };
+    kopf.appendChild(weg);
+  }
+
+  const inhalt = document.createElement('div');
+  inhalt.className = 'inhalt';
+  inhalt.textContent = text;
+
+  zeile.appendChild(kopf);
+  zeile.appendChild(inhalt);
+  return zeile;
+}
+
+function wannText(zeitpunkt) {
+  const minuten = Math.round((Date.now() - new Date(zeitpunkt)) / 60000);
+  if (minuten < 1)    return 'gerade eben';
+  if (minuten < 60)   return 'vor ' + minuten + ' Min.';
+  const stunden = Math.round(minuten / 60);
+  if (stunden < 24)   return 'vor ' + stunden + (stunden === 1 ? ' Std.' : ' Std.');
+  const tage = Math.round(stunden / 24);
+  return 'vor ' + tage + (tage === 1 ? ' Tag' : ' Tagen');
+}
+
 
 function ersatzPlayer(datei, videoElement) {
   const kasten = document.createElement('div');
