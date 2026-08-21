@@ -339,17 +339,21 @@
   #overlay .ersatz p { color: var(--grau); }
 
   /* ---- Kommentare ---- */
-  .kommentare {
+  .kommentare { margin-top: .7rem; }
+  #overlay .kommentare {
     border-top: 1px solid var(--rand);
     padding: .8rem;
+    margin-top: 0;
   }
-  .kommentare h3 {
-    font-family: var(--serif);
-    font-size: .95rem;
-    font-weight: normal;
-    margin: 0 0 .7rem;
+  .kommentarliste { margin-bottom: .5rem; }
+  .kommentarliste:empty { margin-bottom: 0; }
+
+  .kommentar {
+    margin-bottom: .45rem;
+    font-size: .82rem;
+    padding-left: .6rem;
+    border-left: 2px solid var(--rand);
   }
-  .kommentar { margin-bottom: .8rem; font-size: .85rem; }
   .kommentar .kopf {
     display: flex;
     align-items: baseline;
@@ -365,24 +369,25 @@
   }
   .kommentar .inhalt { white-space: pre-wrap; }
 
-  .kommentarform { display: flex; gap: .45rem; align-items: flex-start; }
+  .kommentarform { display: flex; gap: .4rem; align-items: flex-start; }
   .kommentarform textarea {
     font: inherit;
-    font-size: .85rem;
+    font-size: .82rem;
     flex: 1 1 auto;
-    min-height: 38px;
-    padding: .5rem;
+    max-width: 460px;
+    min-height: 36px;
+    padding: .45rem .55rem;
     border: 1px solid var(--rand);
     border-radius: 6px;
     background: var(--flaeche);
     color: var(--text);
     resize: vertical;
   }
+  .kommentarform textarea::placeholder { color: var(--blass); }
   .kommentarform textarea:focus-visible {
     outline: 2px solid var(--text);
     outline-offset: 1px;
   }
-  .kommentare .leerhinweis { font-size: .8rem; color: var(--blass); margin-bottom: .7rem; }
 
   /* ---- Handy-Vorschau ---- */
   body.handy {
@@ -501,6 +506,14 @@ const CONFIG = {
 
   // Wie viele Tage die Zeitleiste zeigt.
   ZEITLEISTE_TAGE: 30,
+
+  // Clips im Hintergrund holen, sobald ein Tag ins Blickfeld scrollt.
+  // Dann ist beim Antippen meist nichts mehr zu laden.
+  VORLADEN: true,
+
+  // Wie viele Tage höchstens vorgeladen werden, damit nicht beim
+  // ersten Öffnen der ganze Monat durch die Leitung geht.
+  VORLADEN_MAX_TAGE: 5,
 
   // Wer wann dran ist.
   //
@@ -960,6 +973,10 @@ async function laden() {
 
     if (CONFIG.AUTO_LOESCHEN) await aufraeumen();
 
+    kommentare = {};
+    await kommentareVorladen(alleAnker());
+    cacheAufraeumen();          // nebenher
+
     el.status.hidden = true;
     zeichne();
   } catch (fehler) {
@@ -1058,6 +1075,7 @@ window.addEventListener('resize', function () {
 
 function zeichneZeitleiste() {
   el.zeitleiste.innerHTML = '';
+  vorgeladeneTage = 0;
   const heute = schluessel(new Date());
 
   for (let i = 0; i < CONFIG.ZEITLEISTE_TAGE; i++) {
@@ -1104,6 +1122,12 @@ function tagZeile(tag, heuteSchluessel) {
 
   if (clips.length) {
     inhalt.appendChild(kachelReihe(clips));
+    inhalt.appendChild(kommentarBlock(clips[0]));
+
+    // Sobald diese Zeile in die Nähe des Bildschirms kommt, werden
+    // ihre Clips im Hintergrund geholt.
+    zeile._clips = clips;
+    if (sichtbarkeit) sichtbarkeit.observe(zeile);
   } else {
     zeile.classList.add('leerlauf');
     const leer = document.createElement('div');
@@ -1418,7 +1442,11 @@ async function zeigeClip() {
     el.overlayIn.appendChild(anzeige);
     el.overlayIn.appendChild(spielLeiste(datei, url));
 
-    if (!datei.vorschau) el.overlayIn.appendChild(kommentarbereich(datei));
+    // Kommentare gehören dem Tag, nicht dem einzelnen Clip
+    if (!datei.vorschau) {
+      const anker = ankerVon(datei);
+      if (anker) el.overlayIn.appendChild(kommentarBlock(anker));
+    }
 
     vorladen();
 
@@ -1495,9 +1523,15 @@ function spielLeiste(datei, url) {
 // Speicher, keine Konflikte, wenn zwei gleichzeitig schreiben, und die
 // Kommentare verschwinden nach 30 Tagen zusammen mit dem Video.
 //
+// Sie hängen am ERSTEN Clip eines Tages, nicht an jedem einzelnen –
+// sonst verteilt sich ein Gespräch über fünf Clips und niemand findet
+// es wieder. Der erste Clip ist also der Anker für den ganzen Tag.
+//
 // Ein Haken: Alle benutzen dasselbe Projekt-Konto, also stünde bei
 // jedem Kommentar derselbe Verfasser. Deshalb wird der Name aus der
 // "Ich bin"-Auswahl vorangestellt und beim Anzeigen wieder abgetrennt.
+
+let kommentare = {};   // Anker-Datei-ID → Liste
 
 /** Name aus der Auswahl, ohne die Nummer davor: "02-lennart" → "lennart" */
 function meinName() {
@@ -1506,57 +1540,38 @@ function meinName() {
   return gewaehlt.textContent.replace(/^\s*\d+\s*[-_.]?\s*/, '').trim();
 }
 
-function kommentarbereich(datei) {
-  const kasten = document.createElement('div');
-  kasten.className = 'kommentare';
-  kasten.innerHTML = '<h3>Kommentare</h3>'
-                   + '<div class="leerhinweis">lädt …</div>';
+/**
+ * Holt die Kommentare aller Tage auf einmal. Parallel, weil sonst
+ * 26 Anfragen nacheinander liefen; einzeln sind sie winzig.
+ */
+async function kommentareVorladen(anker) {
+  const ergebnisse = await Promise.all(anker.map(function (datei) {
+    return kommentareHolen(datei).catch(function () { return null; });
+  }));
 
-  const liste = document.createElement('div');
-  kasten.appendChild(liste);
+  anker.forEach(function (datei, i) {
+    if (ergebnisse[i]) kommentare[datei.id] = ergebnisse[i];
+  });
+}
 
-  const form = document.createElement('div');
-  form.className = 'kommentarform';
+/** Der Anker zu einer beliebigen Datei: der erste Clip desselben Tages. */
+function ankerVon(datei) {
+  const gleiche = dateien.filter(function (d) {
+    return d.tagSchluessel === datei.tagSchluessel && d.ordner === datei.ordner;
+  }).sort(nachName);
+  return gleiche[0] || null;
+}
 
-  const feld = document.createElement('textarea');
-  feld.rows = 1;
-  feld.placeholder = meinName()
-    ? 'Kommentieren als ' + meinName() + ' …'
-    : 'Oben bei "Ich bin" auswählen, wer du bist';
-  form.appendChild(feld);
-
-  const senden = document.createElement('button');
-  senden.className = 'wichtig';
-  senden.textContent = 'Senden';
-  form.appendChild(senden);
-
-  senden.onclick = async function () {
-    const text = feld.value.trim();
-    if (!text) return;
-
-    senden.disabled = true;
-    try {
-      await kommentarSchreiben(datei, text);
-      feld.value = '';
-      await kommentareZeigen(datei, kasten, liste);
-    } catch (fehler) {
-      zeigeFehler(fehler.message);
-    } finally {
-      senden.disabled = false;
+/** Die Anker-Dateien: jeweils der erste Clip eines Tages. */
+function alleAnker() {
+  const gruppen = {};
+  dateien.forEach(function (d) {
+    const schluessel = d.tagSchluessel + '|' + d.ordner;
+    if (!gruppen[schluessel] || nachName(d, gruppen[schluessel]) < 0) {
+      gruppen[schluessel] = d;
     }
-  };
-
-  // Enter sendet, Umschalt+Enter macht einen Zeilenumbruch
-  feld.onkeydown = function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      senden.click();
-    }
-  };
-
-  kasten.appendChild(form);
-  kommentareZeigen(datei, kasten, liste);
-  return kasten;
+  });
+  return Object.keys(gruppen).map(function (k) { return gruppen[k]; });
 }
 
 async function kommentareHolen(datei) {
@@ -1570,7 +1585,10 @@ async function kommentareHolen(datei) {
     headers: { Authorization: 'Bearer ' + token }
   });
   if (!antwort.ok) throw new Error('Kommentare konnten nicht geladen werden.');
-  return (await antwort.json()).comments || [];
+
+  return ((await antwort.json()).comments || []).sort(function (a, b) {
+    return new Date(a.createdTime) - new Date(b.createdTime);
+  });
 }
 
 async function kommentarSchreiben(datei, text) {
@@ -1581,8 +1599,7 @@ async function kommentarSchreiben(datei, text) {
   }
 
   const antwort = await fetch(
-    'https://www.googleapis.com/drive/v3/files/' + datei.id
-      + '/comments?fields=id',
+    'https://www.googleapis.com/drive/v3/files/' + datei.id + '/comments?fields=id',
     {
       method: 'POST',
       headers: {
@@ -1604,36 +1621,70 @@ async function kommentarLoeschen(datei, id) {
     { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
 }
 
-async function kommentareZeigen(datei, kasten, liste) {
-  const hinweis = kasten.querySelector('.leerhinweis');
+/** Baut den Kommentarbereich für einen Tag. Nutzt den Zwischenspeicher. */
+function kommentarBlock(anker) {
+  const kasten = document.createElement('div');
+  kasten.className = 'kommentare';
 
-  let kommentare;
-  try {
-    kommentare = await kommentareHolen(datei);
-  } catch (fehler) {
-    hinweis.textContent = fehler.message;
-    return;
-  }
+  const liste = document.createElement('div');
+  liste.className = 'kommentarliste';
+  kasten.appendChild(liste);
 
-  liste.innerHTML = '';
+  const form = document.createElement('div');
+  form.className = 'kommentarform';
 
-  if (!kommentare.length) {
-    hinweis.textContent = 'Noch keine Kommentare.';
-    hinweis.hidden = false;
-    return;
-  }
-  hinweis.hidden = true;
+  const feld = document.createElement('textarea');
+  feld.rows = 1;
+  feld.placeholder = meinName()
+    ? 'Kommentieren als ' + meinName() + ' …'
+    : 'Oben bei "Ich bin" auswählen, wer du bist';
+  form.appendChild(feld);
 
-  kommentare
-    .sort(function (a, b) {
-      return new Date(a.createdTime) - new Date(b.createdTime);
-    })
-    .forEach(function (k) {
-      liste.appendChild(kommentarZeile(datei, k, kasten, liste));
-    });
+  const senden = document.createElement('button');
+  senden.textContent = 'Senden';
+  form.appendChild(senden);
+
+  senden.onclick = async function () {
+    const text = feld.value.trim();
+    if (!text) return;
+    senden.disabled = true;
+    try {
+      await kommentarSchreiben(anker, text);
+      feld.value = '';
+      kommentare[anker.id] = await kommentareHolen(anker);
+      fuelleKommentarliste(anker, liste, kasten);
+    } catch (fehler) {
+      zeigeFehler(fehler.message);
+    } finally {
+      senden.disabled = false;
+    }
+  };
+
+  // Enter sendet, Umschalt+Enter macht einen Zeilenumbruch
+  feld.onkeydown = function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      senden.click();
+    }
+  };
+
+  kasten.appendChild(form);
+  fuelleKommentarliste(anker, liste, kasten);
+  return kasten;
 }
 
-function kommentarZeile(datei, k, kasten, liste) {
+function fuelleKommentarliste(anker, liste, kasten) {
+  const vorhanden = kommentare[anker.id] || [];
+  liste.innerHTML = '';
+
+  if (!vorhanden.length) return;
+
+  vorhanden.forEach(function (k) {
+    liste.appendChild(kommentarZeile(anker, k, liste, kasten));
+  });
+}
+
+function kommentarZeile(anker, k, liste, kasten) {
   const zeile = document.createElement('div');
   zeile.className = 'kommentar';
 
@@ -1655,8 +1706,9 @@ function kommentarZeile(datei, k, kasten, liste) {
     weg.textContent = 'löschen';
     weg.onclick = async function () {
       weg.disabled = true;
-      await kommentarLoeschen(datei, k.id);
-      await kommentareZeigen(datei, kasten, liste);
+      await kommentarLoeschen(anker, k.id);
+      kommentare[anker.id] = await kommentareHolen(anker);
+      fuelleKommentarliste(anker, liste, kasten);
     };
     kopf.appendChild(weg);
   }
@@ -1702,8 +1754,62 @@ function tageBisLoeschung(erstellt) {
   return Math.max(0, Math.ceil((weg - Date.now()) / 86400000));
 }
 
+// ---- Dauerhafter Zwischenspeicher ----
+//
+// Der Browser-Cache hilft hier nicht: Die Videos kommen mit einem
+// Authorization-Header, den er nicht mitspeichert. Also legen wir sie
+// selbst ab. Der Speicher überlebt das Schließen des Tabs – ein Tag
+// wird dadurch genau einmal heruntergeladen, danach nie wieder.
+
+const CACHE_NAME = 'videotagebuch-dateien';
+
+function cacheSchluessel(id) {
+  return 'https://videotagebuch.local/datei/' + id;
+}
+
+async function ausCache(id) {
+  if (!('caches' in window)) return null;
+  try {
+    const c = await caches.open(CACHE_NAME);
+    const treffer = await c.match(cacheSchluessel(id));
+    return treffer ? await treffer.blob() : null;
+  } catch (e) { return null; }
+}
+
+async function inCache(id, blob) {
+  if (!('caches' in window)) return;
+  try {
+    const c = await caches.open(CACHE_NAME);
+    await c.put(cacheSchluessel(id), new Response(blob));
+  } catch (e) {
+    // Speicher voll oder vom Browser verweigert – dann wird eben
+    // wieder geladen. Kein Grund, etwas abzubrechen.
+  }
+}
+
+/** Wirft aus dem Speicher, was es in Drive nicht mehr gibt. */
+async function cacheAufraeumen() {
+  if (!('caches' in window)) return;
+  try {
+    const c = await caches.open(CACHE_NAME);
+    const vorhanden = new Set(dateien.map(function (d) {
+      return cacheSchluessel(d.id);
+    }));
+    const alte = await c.keys();
+    for (const anfrage of alte) {
+      if (!vorhanden.has(anfrage.url)) await c.delete(anfrage);
+    }
+  } catch (e) {}
+}
+
 async function blobUrl(datei, fortschritt) {
   if (datei._url) return datei._url;
+
+  const gespeichert = await ausCache(datei.id);
+  if (gespeichert) {
+    datei._url = URL.createObjectURL(gespeichert);
+    return datei._url;
+  }
 
   const antwort = await fetch(
     'https://www.googleapis.com/drive/v3/files/' + datei.id + '?alt=media',
@@ -1724,9 +1830,67 @@ async function blobUrl(datei, fortschritt) {
     if (gesamt && fortschritt) fortschritt(Math.round(geladen / gesamt * 100));
   }
 
-  datei._url = URL.createObjectURL(new Blob(teile, { type: datei.mimeType }));
+  const blob = new Blob(teile, { type: datei.mimeType });
+  inCache(datei.id, blob);          // nebenher, nicht abwarten
+  datei._url = URL.createObjectURL(blob);
   return datei._url;
 }
+
+
+// ---- Vorladen ----
+//
+// Eine Schlange, die immer nur einen Clip auf einmal holt. Alles
+// gleichzeitig zu laden würde die Leitung verstopfen und ausgerechnet
+// das Video ausbremsen, das gerade jemand anschaut.
+
+let vorladeSchlange = [];
+let vorladeLaeuft = false;
+let vorgeladeneTage = 0;
+
+function schontDaten() {
+  const v = navigator.connection;
+  return !!(v && (v.saveData || /^([23]g|slow-2g)$/.test(v.effectiveType || '')));
+}
+
+function vorladenPlanen(clips) {
+  if (!CONFIG.VORLADEN || schontDaten()) return;
+  if (vorgeladeneTage >= CONFIG.VORLADEN_MAX_TAGE) return;
+  vorgeladeneTage++;
+
+  clips.forEach(function (d) {
+    if (!d._url && !d._geplant) {
+      d._geplant = true;
+      vorladeSchlange.push(d);
+    }
+  });
+  schlangeAbarbeiten();
+}
+
+async function schlangeAbarbeiten() {
+  if (vorladeLaeuft) return;
+  vorladeLaeuft = true;
+
+  while (vorladeSchlange.length) {
+    const datei = vorladeSchlange.shift();
+    try { await blobUrl(datei); } catch (e) { /* später erneut */ }
+  }
+  vorladeLaeuft = false;
+}
+
+/**
+ * Beobachtet die Tageszeilen und lädt deren Clips, sobald sie in die
+ * Nähe des Bildfelds kommen – 300 Pixel vorher, damit es fertig ist,
+ * bevor jemand tippt.
+ */
+const sichtbarkeit = ('IntersectionObserver' in window)
+  ? new IntersectionObserver(function (eintraege) {
+      eintraege.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        sichtbarkeit.unobserve(e.target);
+        if (e.target._clips) vorladenPlanen(e.target._clips);
+      });
+    }, { rootMargin: '300px' })
+  : null;
 
 
 // ============ ZUSAMMENSTELLEN UND HOCHLADEN ============
