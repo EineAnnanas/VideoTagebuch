@@ -542,6 +542,14 @@ const CONFIG = {
   // Ab wie wenig freiem Speicher gewarnt wird (in GB).
   SPEICHER_WARNUNG_GB: 2,
 
+  // Hauptschalter für die Upload-Grenzen weiter unten.
+  //
+  // Auf false wird nichts blockiert – Auflösung und Länge stehen aber
+  // weiterhin in der Liste, man sieht also trotzdem, wenn jemand in
+  // 4K filmt. Auf true schaltest du die Sperre wieder ein, falls der
+  // Speicher doch knapp wird.
+  GRENZEN_AKTIV: false,
+
   // Grenzen fürs Hochladen.
   //
   // Das sind Leitplanken, keine Schlösser: Wer will, kann immer noch
@@ -549,7 +557,7 @@ const CONFIG = {
   // Absicht – und Versehen ist hier das eigentliche Risiko, weil ein
   // einziges 4K-Video den Speicher für alle wegfrisst.
   //
-  // 0 schaltet die jeweilige Grenze ab.
+  // 0 schaltet die jeweilige Grenze einzeln ab.
   GRENZEN: {
     // Kurze Seite des Bildes. 1080 lässt Full HD durch (1080×1920
     // hochkant), weist 4K aber ab (2160×3840).
@@ -1919,6 +1927,8 @@ el.datei.onchange = function () {
  * angelesen hat – bis dahin bleibt die Liste leer.
  */
 function problemeVon(eintrag) {
+  if (!CONFIG.GRENZEN_AKTIV) return [];
+
   const g = CONFIG.GRENZEN;
   const probleme = [];
 
@@ -1953,6 +1963,8 @@ function bereitsAnDiesemTag() {
 }
 
 function tagesProblem() {
+  if (!CONFIG.GRENZEN_AKTIV) return null;
+
   const grenze = CONFIG.GRENZEN.MB_PRO_TAG;
   if (!grenze) return null;
 
