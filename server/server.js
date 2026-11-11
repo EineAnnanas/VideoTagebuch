@@ -21,12 +21,8 @@ db.run(`CREATE TABLE IF NOT EXISTS reminders (
   timezone TEXT
 )`);
 
-const vapidSubject = process.env.DUCKDNS_SUBDOMAIN
-  ? `https://${process.env.DUCKDNS_SUBDOMAIN}.duckdns.org`
-  : 'https://localhost';
-
 webPush.setVapidDetails(
-  vapidSubject,
+  'https://github.com/EineAnnanas/VideoTagebuch',
   process.env.VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY
 );

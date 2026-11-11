@@ -1,32 +1,16 @@
 services:
-  # 1. Your Node.js Backend
   reminder-api:
     build: .
     restart: unless-stopped
     environment:
       - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
-      - DUCKDNS_SUBDOMAIN=${DUCKDNS_SUBDOMAIN}
     volumes:
       - ./data:/app/data
 
-  # 2. DuckDNS IP Updater
-  duckdns:
-    image: lscr.io/linuxserver/duckdns:latest
+  tunnel:
+    image: cloudflare/cloudflared:latest
     restart: unless-stopped
+    command: tunnel --no-autoupdate run
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Berlin
-      - SUBDOMAINS=${DUCKDNS_SUBDOMAIN}
-      - TOKEN=${DUCKDNS_TOKEN}
-      - UPDATE_IP=ipv6
-
-  # 3. Nginx Proxy Manager (Handles HTTPS and routing)
-  npm:
-    image: jc21/nginx-proxy-manager:latest
-    restart: unless-stopped
-    network_mode: host
-    volumes:
-      - ./npm/data:/data
-      - ./npm/letsencrypt:/etc/letsencrypt
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
