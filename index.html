@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Videotagebuch</title>
 
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-96x96.png">
+  <link rel="shortcut icon" href="icons/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+
+  <link rel="manifest" href="manifest.webmanifest">
+
 <!--
   ============================================================
    VIDEOTAGEBUCH
@@ -466,6 +473,96 @@
   </div>
 </section>
 
+<!-- Reminder settings UI -->
+<div id="reminder-box" style="margin: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px;">
+  <h3>Tägliche Erinnerung</h3>
+
+  <div style="margin-bottom: 10px;">
+    <label for="server-url">Server URL:</label>
+    <input type="text" id="server-url" placeholder="https://dein-notifications-server.com" style="width: 100%;">
+    <small>Wird nur lokal in deinem Browser gespeichert.</small>
+  </div>
+
+  <div style="margin-bottom: 10px;">
+    <label for="reminder-time">Uhrzeit:</label>
+    <input type="time" id="reminder-time" value="20:00">
+  </div>
+
+  <button id="btn-subscribe">Erinnerung aktivieren</button>
+  <p id="reminder-status"></p>
+</div>
+
+<script>
+  // Load saved settings on startup
+  window.addEventListener('DOMContentLoaded', () => {
+    const configSuccessfull = await loadServerConfig();
+      if (!configSuccessfull) {
+        alert("Bitte trage unten deine Server-URL ein, um die Daten zu laden.");
+      }
+  });
+
+  // ... (Service Worker Registration & urlBase64ToUint8Array function stay the same) ...
+
+  document.getElementById('btn-subscribe').addEventListener('click', async () => {
+    const status = document.getElementById('reminder-status');
+
+    if (!CONFIG.VAPID_PUBLIC_KEY) {
+       status.innerText = 'Server nicht erreichbar oder kein VAPID-Key hinterlegt.';
+       return;
+     }
+
+    const time = document.getElementById('reminder-time').value;
+    let serverUrl = document.getElementById('server-url').value.trim();
+
+    if (!serverUrl || !time) {
+      status.innerText = 'Bitte Server-URL und Uhrzeit eingeben.';
+      return;
+    }
+
+    // Remove trailing slash if user added one
+    if (serverUrl.endsWith('/')) {
+      serverUrl = serverUrl.slice(0, -1);
+    }
+
+    // Save URL to browser storage so user doesn't have to enter it again
+    localStorage.setItem('tagebuch_server_url', serverUrl);
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        status.innerText = 'Benachrichtigungen wurden blockiert.';
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(CONFIG.VAPID_PUBLIC_KEY)
+      });
+
+      // Send to the dynamically provided URL
+      const res = await fetch(`${serverUrl}/api/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription,
+          time,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        })
+      });
+
+      if (res.ok) {
+        status.innerText = `Erinnerung erfolgreich für ${time} Uhr eingerichtet!`;
+      } else {
+        status.innerText = 'Fehler beim Verbinden mit dem Server.';
+      }
+    } catch (err) {
+      console.error(err);
+      status.innerText = 'Ein Fehler ist aufgetreten. Server erreichbar?';
+    }
+  });
+</script>
+
 <div id="fehler" hidden></div>
 <p id="aufgeraeumt" hidden></p>
 <p id="status">Nicht angemeldet.</p>
@@ -492,7 +589,7 @@
 <script>
 // ============ EINSTELLUNGEN ============
 
-const CONFIG = {
+let CONFIG = {
 
   CLIENT_ID: '162999381232-kmusrtl8hsnp8ilr8dg71pb7q9udobnm.apps.googleusercontent.com',
 
@@ -523,26 +620,16 @@ const CONFIG = {
   // denselben Wochentag. Nach acht Wochen war jeder einmal überall.
   //
   // null steht für den Pausentag.
-  REIHENFOLGE: [
-    'fabian', 'lennart', 'joshua', 'dario', 'benni', 'jarno', 'timo', null
-  ],
+  REIHENFOLGE: [],
 
   // Erster Tag des Zyklus – an diesem Tag ist der erste Name dran.
-  ZYKLUS_START: '2026-08-10',
+  ZYKLUS_START: '',
 
   // Die Projekt-Konten. Meldet sich jemand mit seinem privaten Konto
   // an, warnt die Seite: Dort ist meist kaum Platz frei, und das
   // Video zählte gegen den eigenen Speicher.
   // Leer lassen schaltet die Prüfung ab.
-  KONTEN: [
-    'speicherplatzfurvlogs@gmail.com',
-    'auskunftgesucht@gmail.com',
-    'tagebuch.timo2026@gmail.com',
-    'tagebuch.benni2026@gmail.com',
-    'tagebuch.jarno2026@gmail.com',
-    'tagebuch.joshua2026@gmail.com',
-    'dario.lichtner@yahoo.com'
-  ],
+  KONTEN_HASHES: [],
 
   // Ab wie wenig freiem Speicher gewarnt wird (in GB).
   SPEICHER_WARNUNG_GB: 2,
@@ -589,6 +676,33 @@ const CONFIG = {
   // dann sähe niemand die Videos der anderen.
   BEREICH: 'https://www.googleapis.com/auth/drive'
 };
+
+async function loadServerConfig() {
+  const serverUrl = localStorage.getItem('tagebuch_server_url');
+
+  if (!serverUrl) {
+    console.warn("Keine Server-URL hinterlegt. Bitte in den Einstellungen eintragen.");
+    return false;
+  }
+
+  try {
+    const res = await fetch(`${serverUrl}/api/config`);
+    if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+
+    const serverConfig = await res.json();
+
+    // Fill your existing CONFIG object with the data from the Raspberry Pi
+    CONFIG.REIHENFOLGE = serverConfig.reihenfolge || [];
+    CONFIG.ZYKLUS_START = serverConfig.zyklus_start || '';
+    CONFIG.KONTEN_HASHES = serverConfig.konten_hashes || [];
+    CONFIG.VAPID_PUBLIC_KEY = serverConfig.vapid_public_key || '';
+
+    return true;
+  } catch (err) {
+    console.error("Konnte Konfiguration vom Raspberry Pi nicht laden:", err);
+    return false;
+  }
+}
 
 const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli',
@@ -759,6 +873,14 @@ async function angemeldet() {
   if (await zeigeKonto()) laden();
 }
 
+async function sha256(text) {
+  const buffer = new TextEncoder().encode(text.toLowerCase().trim());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 /**
  * Wer ist gerade angemeldet? Wird angezeigt und gegen die Liste der
  * Projekt-Konten geprüft.
@@ -784,7 +906,9 @@ async function zeigeKonto() {
   el.konto.textContent = meineMail
     + (frei === null ? '' : ' · ' + frei.toFixed(1).replace('.', ',') + ' GB frei');
 
-  if (CONFIG.KONTEN.length && CONFIG.KONTEN.indexOf(meineMail) === -1) {
+  const meineMailHash = await sha256(meineMail);
+
+  if (CONFIG.KONTEN_HASHES && CONFIG.KONTEN_HASHES.length && !CONFIG.KONTEN_HASHES.includes(meineMailHash)) {
     // Nicht merken – sonst schlägt die Seite beim nächsten Mal
     // wieder dasselbe falsche Konto vor.
     el.konto.classList.add('falsch');

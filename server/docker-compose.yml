@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # 1. Your Node.js Backend
+  reminder-api:
+    build: .
+    restart: unless-stopped
+    environment:
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - DUCKDNS_SUBDOMAIN=${DUCKDNS_SUBDOMAIN}
+    volumes:
+      - ./data:/app/data
+
+  # 2. DuckDNS IP Updater
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - SUBDOMAINS=${DUCKDNS_SUBDOMAIN}
+      - TOKEN=${DUCKDNS_TOKEN}
+      - UPDATE_IP=ipv4
+
+  # 3. Nginx Proxy Manager (Handles HTTPS and routing)
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP traffic
+      - "443:443"   # HTTPS traffic
+      - "81:81"     # Web UI for configuration
+    volumes:
+      - ./npm/data:/data
+      - ./npm/letsencrypt:/etc/letsencrypt
