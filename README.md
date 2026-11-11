@@ -98,33 +98,37 @@ docker compose up -d
 
 ---
 
-## 🌐 Netzwerk & SSL (HTTPS)
+## 🌐 Netzwerk & SSL (HTTPS für IPv6 / DS-Lite)
 
-Da GitHub Pages über `HTTPS` läuft, verlangen Browser zwingend eine verschlüsselte Verbindung zum Backend.
+Da GitHub Pages über `HTTPS` läuft, verlangen Browser zwingend eine verschlüsselte Verbindung zum Backend. 
 
-### 1. Router-Portweiterleitung
-Öffne das Konfigurationsmenü deines Routers (z. B. Fritz!Box) und erstelle zwei Portweiterleitungen auf die lokale IP-Adresse deines Raspberry Pi:
-- **Port 80 (TCP)** → Raspberry Pi Port 80
-- **Port 443 (TCP)** → Raspberry Pi Port 443
+### 1. Router IPv6-Freigabe (z. B. AVM FRITZ!Box)
+Da der Raspberry Pi eine eigene öffentliche IPv6-Adresse besitzt, wird keine klassische Portweiterleitung eingerichtet, sondern eine Firewall-Freigabe für das Gerät:
+
+1. Öffne das Router-Menü (z. B. `http://fritz.box`).
+2. Gehe zu **Internet** → **Freigaben** → **Portfreigaben**.
+3. Wähle deinen Raspberry Pi aus (bzw. klicke auf das Stift-Symbol zum Bearbeiten).
+4. Erstelle unter **IPv6-Freigaben** zwei Regeln (bzw. aktiviere alternativ *IPv6 Host Exposure*):
+   - **Port 80 (TCP)** freigeben *(für die Let's-Encrypt-Zertifikatsausstellung)*
+   - **Port 443 (TCP)** freigeben *(für den verschlüsselten HTTPS-Verkehr)*
+5. Speichere die Einstellungen. Der Router lässt eingehenden Datenverkehr nun direkt zur IPv6-Adresse deines Raspberry Pi durch.
 
 ### 2. Nginx Proxy Manager (NPM) einrichten
-1. Öffne im Browser: `http://<IP-DEINES-RASPBERRY-PI>:81`
-2. Melde dich mit den Standard-Zugangsdaten an:
-   - **E-Mail:** `admin@example.com`
-   - **Passwort:** `changeme`
-   *(Ändere die Daten direkt nach dem ersten Login)*
+1. Öffne im Browser: `http://<LOKALE-IP-DEINES-RASPBERRY-PI>:81`
+2. Melde dich an bzw. erstelle einen Nutzer.
 3. Gehe zu **Hosts** → **Proxy Hosts** → **Add Proxy Host**:
    - **Domain Names:** `deine-subdomain.duckdns.org`
    - **Scheme:** `http`
-   - **Forward Hostname / IP:** `reminder-api`
+   - **Forward Hostname / IP:** `127.0.0.1`
    - **Forward Port:** `3000`
    - **Block Common Exploits:** Aktivieren
 4. Wechsle in den Reiter **SSL**:
    - **SSL Certificate:** *Request a new SSL Certificate*
    - **Force SSL:** Aktivieren
-   - AGB akzeptieren und auf **Save** klicken.
+   - Auf **Save** klicken.
+   *(Das kann mitunter etwas länger dauern)*
 
-Dein Backend ist nun dauerhaft unter `https://deine-subdomain.duckdns.org` erreichbar.
+Dein Backend ist nun dauerhaft und sicher unter `https://deine-subdomain.duckdns.org` über IPv6 erreichbar.
 
 ---
 
