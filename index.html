@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Videotagebuch</title>
 
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-96x96.png">
+  <link rel="shortcut icon" href="icons/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+
+  <link rel="manifest" href="manifest.webmanifest">
+
 <!--
   ============================================================
    VIDEOTAGEBUCH
@@ -422,6 +429,242 @@
     margin-bottom: 1rem;
   }
   [hidden] { display: none !important; }
+  /* ---- Einstellungen Overlay (im Stil von VideoTagebuch) ---- */
+
+  /* Dezenter Knopf oben rechts */
+  #btn-open-settings {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    color: var(--grau);
+    border-radius: 6px;
+    cursor: pointer;
+    z-index: 99;
+    box-shadow: 0 2px 6px rgba(44, 43, 38, 0.06);
+    transition: background .12s ease, border-color .12s ease, color .12s ease;
+  }
+
+  @media (hover: hover) {
+    #btn-open-settings:hover {
+      background: #f3f1e9;
+      border-color: var(--blass);
+      color: var(--text);
+    }
+  }
+  #btn-open-settings:active { background: #eae7db; }
+
+  /* Hintergrund-Abdunklung (entspricht dem #overlay der Seite) */
+  #settings-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 19, 17, 0.7);
+    display: flex;
+    align-items: flex-end; /* Am Handy als Sheet von unten */
+    justify-content: center;
+    padding: 0;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+  }
+
+  #settings-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Das Dialogfeld */
+  .settings-karte {
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 8px 8px 0 0;
+    padding: 1.25rem 1.25rem 1.75rem;
+    box-shadow: 0 -4px 20px rgba(20, 19, 17, 0.15);
+    transform: translateY(100%);
+    transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (min-width: 560px) {
+    #settings-backdrop {
+      align-items: center;
+      padding: 1rem;
+    }
+    .settings-karte {
+      border-radius: 6px;
+      box-shadow: 0 4px 24px rgba(20, 19, 17, 0.2);
+      transform: scale(0.96);
+    }
+    #settings-backdrop.open .settings-karte {
+      transform: scale(1);
+    }
+  }
+
+  #settings-backdrop.open .settings-karte {
+    transform: translateY(0);
+  }
+
+  .settings-kopf {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--rand);
+    padding-bottom: .6rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .settings-kopf h2 {
+    font-family: var(--serif);
+    font-size: 1.25rem;
+    font-weight: normal;
+    margin: 0;
+    color: var(--text);
+  }
+
+  .settings-abschnitt {
+    margin-bottom: 1.25rem;
+  }
+
+  .settings-titel {
+    display: block;
+    font-size: .72rem;
+    color: var(--grau);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: .45rem;
+  }
+
+  /* Eingabefelder */
+  .settings-eingabe-zeile {
+    display: flex;
+    gap: .45rem;
+  }
+
+  .settings-eingabe-zeile input[type="url"],
+  .settings-uhrzeit-zeile input[type="time"] {
+    font: inherit;
+    font-size: .84rem;
+    padding: .45rem .65rem;
+    min-height: 36px;
+    border: 1px solid var(--rand);
+    border-radius: 6px;
+    background: var(--flaeche);
+    color: var(--text);
+    outline: none;
+    flex: 1 1 auto;
+  }
+
+  .settings-eingabe-zeile input[type="url"]:focus-visible,
+  .settings-uhrzeit-zeile input[type="time"]:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 1px;
+  }
+
+  .settings-hinweis {
+    font-size: .73rem;
+    color: var(--grau);
+    margin-top: .35rem;
+    display: block;
+  }
+
+  /* Schalter-Zeile für Push-Benachrichtigungen */
+  .settings-schalter-zeile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .8rem;
+  }
+
+  .settings-schalter-beschriftung .titel {
+    font-size: .85rem;
+    color: var(--text);
+  }
+  .settings-schalter-beschriftung .untertitel {
+    font-size: .75rem;
+    color: var(--grau);
+  }
+
+  /* Klassischer Schalter im Farbschema der Seite (dunkel gefüllt) */
+  .schalter {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex: 0 0 44px;
+  }
+  .schalter input { opacity: 0; width: 0; height: 0; }
+  .schieber {
+    position: absolute;
+    inset: 0;
+    background: var(--platz);
+    border: 1px solid var(--rand);
+    border-radius: 14px;
+    transition: .18s ease;
+    cursor: pointer;
+  }
+  .schieber:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background: var(--flaeche);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(44, 43, 38, .2);
+    transition: .18s ease;
+  }
+  input:checked + .schieber {
+    background: var(--text);
+    border-color: var(--text);
+  }
+  input:checked + .schieber:before {
+    transform: translateX(20px);
+    background: var(--papier);
+  }
+
+  /* Uhrzeit-Feld */
+  .settings-uhrzeit-zeile {
+    margin-top: .75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px dashed var(--rand);
+    padding-top: .65rem;
+  }
+  .settings-uhrzeit-zeile.versteckt { display: none; }
+  .settings-uhrzeit-zeile label { font-size: .8rem; color: var(--grau); }
+  .settings-uhrzeit-zeile input[type="time"] { flex: 0 0 auto; width: 110px; }
+
+  /* Statusmeldungen (im Stil von #fehler bzw. Hinweisfeldern) */
+  #settings-status {
+    font-size: .78rem;
+    padding: .5rem .7rem;
+    border-radius: 4px;
+    margin-top: .8rem;
+    display: none;
+  }
+  #settings-status.ok {
+    display: block;
+    background: #f1f7ed;
+    border: 1px solid #bfd8b0;
+    color: #27521e;
+  }
+  #settings-status.fehler {
+    display: block;
+    background: #fbf3f1;
+    border: 1px solid #d8b9b1;
+    color: #8c2f22;
+  }
 </style>
 </head>
 <body>
@@ -488,11 +731,61 @@
 
 <div id="overlay" hidden><div id="overlay-inhalt"></div></div>
 
+<!-- Dezenter Einstellungs-Knopf (oben rechts) -->
+<button id="btn-open-settings" title="Einstellungen" aria-label="Einstellungen">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"></circle>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+  </svg>
+</button>
+
+<!-- Einstellungs-Dialog -->
+<div id="settings-backdrop">
+  <div class="settings-karte">
+    <div class="settings-kopf">
+      <h2>Einstellungen</h2>
+      <button id="btn-close-settings" class="leise symbol" title="Schließen">&times;</button>
+    </div>
+
+    <!-- Server URL -->
+    <div class="settings-abschnitt">
+      <span class="settings-titel">Projekt-Server</span>
+      <div class="settings-eingabe-zeile">
+        <input type="url" id="server-url" placeholder="https://tagebuch.deinedomain.com" autocomplete="off" spellcheck="false">
+        <button id="btn-save-server" class="wichtig">Speichern</button>
+      </div>
+      <span class="settings-hinweis">Wird lokal im Browser gespeichert.</span>
+    </div>
+
+    <!-- Push-Erinnerungen -->
+    <div class="settings-abschnitt">
+      <span class="settings-titel">Erinnerung</span>
+      <div class="settings-schalter-zeile">
+        <div class="settings-schalter-beschriftung">
+          <div class="titel">Tägliche Benachrichtigung</div>
+          <div class="untertitel">Erinnert dich an deinen Tagebucheintrag</div>
+        </div>
+        <label class="schalter">
+          <input type="checkbox" id="reminder-toggle">
+          <span class="schieber"></span>
+        </label>
+      </div>
+
+      <div id="settings-time-box" class="settings-uhrzeit-zeile versteckt">
+        <label for="reminder-time">Uhrzeit</label>
+        <input type="time" id="reminder-time" value="20:00">
+      </div>
+
+      <div id="settings-status"></div>
+    </div>
+  </div>
+</div>
+
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 // ============ EINSTELLUNGEN ============
 
-const CONFIG = {
+let CONFIG = {
 
   CLIENT_ID: '162999381232-kmusrtl8hsnp8ilr8dg71pb7q9udobnm.apps.googleusercontent.com',
 
@@ -523,26 +816,16 @@ const CONFIG = {
   // denselben Wochentag. Nach acht Wochen war jeder einmal überall.
   //
   // null steht für den Pausentag.
-  REIHENFOLGE: [
-    'fabian', 'lennart', 'joshua', 'dario', 'benni', 'jarno', 'timo', null
-  ],
+  REIHENFOLGE: [],
 
   // Erster Tag des Zyklus – an diesem Tag ist der erste Name dran.
-  ZYKLUS_START: '2026-08-10',
+  ZYKLUS_START: '',
 
   // Die Projekt-Konten. Meldet sich jemand mit seinem privaten Konto
   // an, warnt die Seite: Dort ist meist kaum Platz frei, und das
   // Video zählte gegen den eigenen Speicher.
   // Leer lassen schaltet die Prüfung ab.
-  KONTEN: [
-    'speicherplatzfurvlogs@gmail.com',
-    'auskunftgesucht@gmail.com',
-    'tagebuch.timo2026@gmail.com',
-    'tagebuch.benni2026@gmail.com',
-    'tagebuch.jarno2026@gmail.com',
-    'tagebuch.joshua2026@gmail.com',
-    'dario.lichtner@yahoo.com'
-  ],
+  KONTEN_HASHES: [],
 
   // Ab wie wenig freiem Speicher gewarnt wird (in GB).
   SPEICHER_WARNUNG_GB: 2,
@@ -589,6 +872,154 @@ const CONFIG = {
   // dann sähe niemand die Videos der anderen.
   BEREICH: 'https://www.googleapis.com/auth/drive'
 };
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(console.error);
+}
+async function loadServerConfig() {
+  const serverUrl = localStorage.getItem('tagebuch_server_url');
+
+  if (!serverUrl) {
+    console.warn("Keine Server-URL hinterlegt. Bitte in den Einstellungen eintragen.");
+    return false;
+  }
+
+  try {
+    const res = await fetch(`${serverUrl}/api/config`);
+    if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+
+    const serverConfig = await res.json();
+
+    // Fill your existing CONFIG object with the data from the Raspberry Pi
+    CONFIG.REIHENFOLGE = serverConfig.reihenfolge || [];
+    CONFIG.ZYKLUS_START = serverConfig.zyklus_start || '';
+    CONFIG.KONTEN_HASHES = serverConfig.konten_hashes || [];
+    CONFIG.VAPID_PUBLIC_KEY = serverConfig.vapid_public_key || '';
+
+    return true;
+  } catch (err) {
+    console.error("Konnte Konfiguration vom Server nicht laden:", err);
+    return false;
+  }
+}
+
+const settingsBackdrop = document.getElementById('settings-backdrop');
+const statusDiv = document.getElementById('settings-status');
+
+document.getElementById('btn-open-settings').onclick = () => settingsBackdrop.classList.add('open');
+document.getElementById('btn-close-settings').onclick = () => settingsBackdrop.classList.remove('open');
+settingsBackdrop.onclick = (e) => { if (e.target === settingsBackdrop) settingsBackdrop.classList.remove('open'); };
+
+function setStatus(msg, err = false) {
+  statusDiv.textContent = msg;
+  statusDiv.className = err ? 'fehler' : 'ok';
+  statusDiv.style.display = 'block';
+  setTimeout(() => statusDiv.style.display = 'none', 4000);
+}
+
+// Save Server URL
+const sInput = document.getElementById('server-url');
+sInput.value = localStorage.getItem('tagebuch_server_url') || '';
+
+document.getElementById('btn-save-server').onclick = async () => {
+  let val = sInput.value.trim().replace(/\/+$/, '');
+  if (!val) return;
+  localStorage.setItem('tagebuch_server_url', val);
+  setStatus('Gespeichert. Lade Daten...');
+
+  const ok = await loadServerConfig();
+  if (ok) {
+    if (typeof initialisiereAnzeige === 'function') initialisiereAnzeige();
+    else if (typeof init === 'function') init();
+    setStatus('Konfiguration geladen!');
+  } else {
+    setStatus('Server nicht erreichbar', true);
+  }
+};
+
+// Notification Toggle & Time Selection
+const rToggle = document.getElementById('reminder-toggle');
+const rTimeBox = document.getElementById('settings-time-box');
+const rTime = document.getElementById('reminder-time');
+
+navigator.serviceWorker?.ready.then(async (reg) => {
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    rToggle.checked = true;
+    rTimeBox.classList.remove('versteckt');
+  }
+  rTime.value = localStorage.getItem('tagebuch_reminder_time') || '20:00';
+});
+
+rToggle.onchange = async () => {
+  if (rToggle.checked) {
+    rTimeBox.classList.remove('versteckt');
+    await registerPush();
+  } else {
+    rTimeBox.classList.add('versteckt');
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+    setStatus('Erinnerung deaktiviert');
+  }
+};
+
+rTime.onchange = () => {
+  if (rToggle.checked) registerPush();
+};
+
+async function registerPush() {
+  const url = localStorage.getItem('tagebuch_server_url');
+  if (!url || !CONFIG.VAPID_PUBLIC_KEY) {
+    setStatus('Erst Server-URL speichern!', true);
+    rToggle.checked = false;
+    rTimeBox.classList.add('versteckt');
+    return;
+  }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      setStatus('Berechtigung verweigert', true);
+      rToggle.checked = false;
+      return;
+    }
+
+    const reg = await navigator.serviceWorker.ready;
+    const padding = '='.repeat((4 - (CONFIG.VAPID_PUBLIC_KEY.length % 4)) % 4);
+    const key = (CONFIG.VAPID_PUBLIC_KEY + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = window.atob(key);
+    const keyArr = Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: keyArr
+    });
+    localStorage.setItem('tagebuch_reminder_time', rTime.value);
+
+    await fetch(`${url}/api/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: sub,
+        time: rTime.value,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      })
+    });
+    setStatus(`Aktiv für ${rTime.value} Uhr`);
+  } catch (err) {
+    console.error(err);
+    setStatus('Fehler beim Aktivieren', true);
+    rToggle.checked = false;
+  }
+}
+
+// On Startup: Try loading config; if missing, automatically open the settings dialog
+window.addEventListener('DOMContentLoaded', async () => {
+  const ok = await loadServerConfig();
+  if (!ok) {
+    settingsBackdrop.classList.add('open');
+  }
+});
 
 const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli',
@@ -759,6 +1190,14 @@ async function angemeldet() {
   if (await zeigeKonto()) laden();
 }
 
+async function sha256(text) {
+  const buffer = new TextEncoder().encode(text.toLowerCase().trim());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 /**
  * Wer ist gerade angemeldet? Wird angezeigt und gegen die Liste der
  * Projekt-Konten geprüft.
@@ -784,7 +1223,9 @@ async function zeigeKonto() {
   el.konto.textContent = meineMail
     + (frei === null ? '' : ' · ' + frei.toFixed(1).replace('.', ',') + ' GB frei');
 
-  if (CONFIG.KONTEN.length && CONFIG.KONTEN.indexOf(meineMail) === -1) {
+  const meineMailHash = await sha256(meineMail);
+
+  if (CONFIG.KONTEN_HASHES && CONFIG.KONTEN_HASHES.length && !CONFIG.KONTEN_HASHES.includes(meineMailHash)) {
     // Nicht merken – sonst schlägt die Seite beim nächsten Mal
     // wieder dasselbe falsche Konto vor.
     el.konto.classList.add('falsch');
