@@ -143,9 +143,9 @@
   /* ---- Spiel ---- */
   #spiel {
     border: 1px solid var(--rand);
-    border-radius: 6px;
+    border-radius: 4px;
     background: var(--papier);
-    margin-bottom: 1.25rem;
+    margin-top: .6rem;
     overflow: hidden;
   }
   .spielkopf {
@@ -1190,6 +1190,12 @@ window.addEventListener('resize', function () {
 // ============ ZEITLEISTE ============
 
 function zeichneZeitleiste() {
+  // Das Spielfeld herausnehmen, bevor die Liste geleert wird – sonst
+  // wäre die Zeichenfläche weg und eine laufende Runde verloren.
+  if (el.spiel.parentNode !== document.body) {
+    document.body.appendChild(el.spiel);
+  }
+
   el.zeitleiste.innerHTML = '';
   vorgeladeneTage = 0;
   const heute = schluessel(new Date());
@@ -1225,6 +1231,12 @@ function tagZeile(tag, heuteSchluessel) {
                      + '<div class="pausenfeld">niemand dran</div>';
     zeile.appendChild(inhalt);
     ergaenzeExtras(inhalt, s, dran);
+
+    if (s === heuteSchluessel) {
+      inhalt.appendChild(el.spiel);
+      el.spiel.hidden = false;
+      if (!spielLauf) spielBereitstellen();
+    }
     return zeile;
   }
 
@@ -1256,6 +1268,15 @@ function tagZeile(tag, heuteSchluessel) {
 
   zeile.appendChild(inhalt);
   ergaenzeExtras(inhalt, s, dran);
+
+  // Der heutige Tag bekommt das Spielfeld – dort schaut man ohnehin
+  // als Erstes hin, und beim Hochladen hat man es gleich vor sich.
+  if (s === heuteSchluessel) {
+    inhalt.appendChild(el.spiel);
+    el.spiel.hidden = false;
+    if (!spielLauf) spielBereitstellen();
+  }
+
   return zeile;
 }
 
@@ -1893,6 +1914,62 @@ const SPIEL = {
 
 let spielLauf = null;
 
+/**
+ * Zeigt das Spielfeld im Ruhezustand: ein stehendes Bild mit
+ * Aufforderung. Erst beim Antippen läuft die Schleife los – ein
+ * dauerhaft laufendes requestAnimationFrame würde auf dem Handy
+ * nur Akku fressen, während man eigentlich Videos anschaut.
+ */
+function spielBereitstellen() {
+  const leinwand = el.spielFeld;
+  const ctx = leinwand.getContext('2d');
+
+  const dpr = window.devicePixelRatio || 1;
+  const breite = leinwand.clientWidth || 320;
+  const hoehe = leinwand.clientHeight || 170;
+  leinwand.width = Math.round(breite * dpr);
+  leinwand.height = Math.round(hoehe * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const bodenY = hoehe - SPIEL.BODEN;
+
+  ctx.fillStyle = '#faf9f5';
+  ctx.fillRect(0, 0, breite, hoehe);
+
+  ctx.strokeStyle = '#d5d1c4';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x < breite; x += 24) {
+    ctx.moveTo(x, bodenY + 0.5);
+    ctx.lineTo(x + 14, bodenY + 0.5);
+  }
+  ctx.stroke();
+
+  // Figur im Stand
+  const fx = 34, fy = bodenY - SPIEL.FIGUR;
+  ctx.fillStyle = '#2c2b26';
+  ctx.beginPath();
+  ctx.roundRect(fx, fy, SPIEL.FIGUR, SPIEL.FIGUR - 4, 4);
+  ctx.fill();
+  ctx.fillRect(fx + 5, fy - 4, 9, 4);
+  ctx.fillStyle = '#faf9f5';
+  ctx.beginPath();
+  ctx.arc(fx + SPIEL.FIGUR / 2, fy + (SPIEL.FIGUR - 4) / 2, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#8a877c';
+  ctx.font = '12px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Tippen zum Spielen · ' + Math.max(1, meinePunkte())
+    + (Math.max(1, meinePunkte()) === 1 ? ' Leben' : ' Leben'),
+    breite / 2, hoehe / 2);
+
+  leinwand.onpointerdown = function () {
+    leinwand.onpointerdown = null;
+    spielStarten();
+  };
+}
+
 function spielStarten() {
   if (spielLauf) return;
 
@@ -1976,13 +2053,15 @@ function spielStarten() {
     window.removeEventListener('resize', groesseAnpassen);
     document.removeEventListener('keydown', taste);
     leinwand.removeEventListener('pointerdown', springen);
-    el.spiel.hidden = true;
+    el.spiel._beenden = null;
+    spielBereitstellen();      // zurück in den Ruhezustand
   };
 }
 
+/** Hält die Runde an, lässt das Feld aber stehen. */
 function spielBeenden() {
   if (el.spiel._beenden) el.spiel._beenden();
-  else el.spiel.hidden = true;
+  else spielBereitstellen();
 }
 
 function rechnen(z, dt) {
@@ -2717,8 +2796,8 @@ document.getElementById('absenden').onclick = async function () {
   el.balken.hidden = false;
   setzeBalken(0);
 
-  // Beim Hochladen von selbst aufgehen – dafür ist es da
-  if (el.spiel.hidden) spielStarten();
+  // Beim Hochladen von selbst loslaufen – dafür ist es da
+  if (!spielLauf) spielStarten();
 
   const fuerTag = plusTage(new Date(), -Number(el.fuer.value || 0));
 
@@ -2799,8 +2878,11 @@ document.getElementById('absenden').onclick = async function () {
 
 function setzeBalken(p) { el.balken.firstElementChild.style.width = p + '%'; }
 
+// Springt zum Spielfeld in der heutigen Zeile und startet es
 el.spielKnopf.onclick = function () {
-  if (el.spiel.hidden) spielStarten(); else spielBeenden();
+  el.spiel.hidden = false;
+  el.spiel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (!spielLauf) spielStarten();
 };
 document.getElementById('spielzu').onclick = spielBeenden;
 
