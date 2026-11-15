@@ -5,13 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Videotagebuch</title>
 
-  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
-  <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-96x96.png">
-  <link rel="shortcut icon" href="icons/favicon.ico">
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
-
-  <link rel="manifest" href="manifest.webmanifest">
-
 <!--
   ============================================================
    VIDEOTAGEBUCH
@@ -322,6 +315,33 @@
   #raster .fehlt { color: var(--blass); }
   #raster .legende { font-size: .72rem; color: var(--grau); padding-top: .6rem; }
 
+  /* ---- Bestenlisten ---- */
+  #punkte {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.75rem;
+  }
+  .bestenliste h3 {
+    font-family: var(--serif);
+    font-size: 1rem;
+    font-weight: normal;
+    margin: 0 0 .5rem;
+    padding-bottom: .3rem;
+    border-bottom: 1px solid var(--rand);
+  }
+  .bestenliste table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .bestenliste td { padding: .22rem 0; }
+  .bestenliste .platz { width: 1.8rem; color: var(--blass); font-size: .78rem; }
+  .bestenliste .wert {
+    text-align: right;
+    font-family: var(--serif);
+    font-size: 1rem;
+  }
+  .bestenliste tr.ich .wer { font-weight: 600; }
+  .bestenliste tr.ich .platz { color: var(--grau); }
+  .bestenliste tr:first-child .wert { font-size: 1.15rem; }
+
   /* ---- Overlay ---- */
   #overlay {
     position: fixed; inset: 0;
@@ -429,242 +449,6 @@
     margin-bottom: 1rem;
   }
   [hidden] { display: none !important; }
-  /* ---- Einstellungen Overlay (im Stil von VideoTagebuch) ---- */
-
-  /* Dezenter Knopf oben rechts */
-  #btn-open-settings {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    width: 36px;
-    height: 36px;
-    min-height: 36px;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--flaeche);
-    border: 1px solid var(--rand);
-    color: var(--grau);
-    border-radius: 6px;
-    cursor: pointer;
-    z-index: 99;
-    box-shadow: 0 2px 6px rgba(44, 43, 38, 0.06);
-    transition: background .12s ease, border-color .12s ease, color .12s ease;
-  }
-
-  @media (hover: hover) {
-    #btn-open-settings:hover {
-      background: #f3f1e9;
-      border-color: var(--blass);
-      color: var(--text);
-    }
-  }
-  #btn-open-settings:active { background: #eae7db; }
-
-  /* Hintergrund-Abdunklung (entspricht dem #overlay der Seite) */
-  #settings-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(20, 19, 17, 0.7);
-    display: flex;
-    align-items: flex-end; /* Am Handy als Sheet von unten */
-    justify-content: center;
-    padding: 0;
-    z-index: 100;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .2s ease;
-  }
-
-  #settings-backdrop.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  /* Das Dialogfeld */
-  .settings-karte {
-    background: var(--flaeche);
-    border: 1px solid var(--rand);
-    width: 100%;
-    max-width: 480px;
-    border-radius: 8px 8px 0 0;
-    padding: 1.25rem 1.25rem 1.75rem;
-    box-shadow: 0 -4px 20px rgba(20, 19, 17, 0.15);
-    transform: translateY(100%);
-    transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  @media (min-width: 560px) {
-    #settings-backdrop {
-      align-items: center;
-      padding: 1rem;
-    }
-    .settings-karte {
-      border-radius: 6px;
-      box-shadow: 0 4px 24px rgba(20, 19, 17, 0.2);
-      transform: scale(0.96);
-    }
-    #settings-backdrop.open .settings-karte {
-      transform: scale(1);
-    }
-  }
-
-  #settings-backdrop.open .settings-karte {
-    transform: translateY(0);
-  }
-
-  .settings-kopf {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    border-bottom: 1px solid var(--rand);
-    padding-bottom: .6rem;
-    margin-bottom: 1.2rem;
-  }
-
-  .settings-kopf h2 {
-    font-family: var(--serif);
-    font-size: 1.25rem;
-    font-weight: normal;
-    margin: 0;
-    color: var(--text);
-  }
-
-  .settings-abschnitt {
-    margin-bottom: 1.25rem;
-  }
-
-  .settings-titel {
-    display: block;
-    font-size: .72rem;
-    color: var(--grau);
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    margin-bottom: .45rem;
-  }
-
-  /* Eingabefelder */
-  .settings-eingabe-zeile {
-    display: flex;
-    gap: .45rem;
-  }
-
-  .settings-eingabe-zeile input[type="url"],
-  .settings-uhrzeit-zeile input[type="time"] {
-    font: inherit;
-    font-size: .84rem;
-    padding: .45rem .65rem;
-    min-height: 36px;
-    border: 1px solid var(--rand);
-    border-radius: 6px;
-    background: var(--flaeche);
-    color: var(--text);
-    outline: none;
-    flex: 1 1 auto;
-  }
-
-  .settings-eingabe-zeile input[type="url"]:focus-visible,
-  .settings-uhrzeit-zeile input[type="time"]:focus-visible {
-    outline: 2px solid var(--text);
-    outline-offset: 1px;
-  }
-
-  .settings-hinweis {
-    font-size: .73rem;
-    color: var(--grau);
-    margin-top: .35rem;
-    display: block;
-  }
-
-  /* Schalter-Zeile für Push-Benachrichtigungen */
-  .settings-schalter-zeile {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: .8rem;
-  }
-
-  .settings-schalter-beschriftung .titel {
-    font-size: .85rem;
-    color: var(--text);
-  }
-  .settings-schalter-beschriftung .untertitel {
-    font-size: .75rem;
-    color: var(--grau);
-  }
-
-  /* Klassischer Schalter im Farbschema der Seite (dunkel gefüllt) */
-  .schalter {
-    position: relative;
-    width: 44px;
-    height: 24px;
-    flex: 0 0 44px;
-  }
-  .schalter input { opacity: 0; width: 0; height: 0; }
-  .schieber {
-    position: absolute;
-    inset: 0;
-    background: var(--platz);
-    border: 1px solid var(--rand);
-    border-radius: 14px;
-    transition: .18s ease;
-    cursor: pointer;
-  }
-  .schieber:before {
-    position: absolute;
-    content: "";
-    height: 16px;
-    width: 16px;
-    left: 3px;
-    bottom: 3px;
-    background: var(--flaeche);
-    border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(44, 43, 38, .2);
-    transition: .18s ease;
-  }
-  input:checked + .schieber {
-    background: var(--text);
-    border-color: var(--text);
-  }
-  input:checked + .schieber:before {
-    transform: translateX(20px);
-    background: var(--papier);
-  }
-
-  /* Uhrzeit-Feld */
-  .settings-uhrzeit-zeile {
-    margin-top: .75rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-top: 1px dashed var(--rand);
-    padding-top: .65rem;
-  }
-  .settings-uhrzeit-zeile.versteckt { display: none; }
-  .settings-uhrzeit-zeile label { font-size: .8rem; color: var(--grau); }
-  .settings-uhrzeit-zeile input[type="time"] { flex: 0 0 auto; width: 110px; }
-
-  /* Statusmeldungen (im Stil von #fehler bzw. Hinweisfeldern) */
-  #settings-status {
-    font-size: .78rem;
-    padding: .5rem .7rem;
-    border-radius: 4px;
-    margin-top: .8rem;
-    display: none;
-  }
-  #settings-status.ok {
-    display: block;
-    background: #f1f7ed;
-    border: 1px solid #bfd8b0;
-    color: #27521e;
-  }
-  #settings-status.fehler {
-    display: block;
-    background: #fbf3f1;
-    border: 1px solid #d8b9b1;
-    color: #8c2f22;
-  }
 </style>
 </head>
 <body>
@@ -725,67 +509,18 @@
 <div id="woche" hidden></div>
 
 <section id="uebersicht" hidden>
+  <div id="punkte"></div>
   <div id="zahlen"></div>
   <table id="raster"></table>
 </section>
 
 <div id="overlay" hidden><div id="overlay-inhalt"></div></div>
 
-<!-- Dezenter Einstellungs-Knopf (oben rechts) -->
-<button id="btn-open-settings" title="Einstellungen" aria-label="Einstellungen">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="3"></circle>
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-  </svg>
-</button>
-
-<!-- Einstellungs-Dialog -->
-<div id="settings-backdrop">
-  <div class="settings-karte">
-    <div class="settings-kopf">
-      <h2>Einstellungen</h2>
-      <button id="btn-close-settings" class="leise symbol" title="Schließen">&times;</button>
-    </div>
-
-    <!-- Server URL -->
-    <div class="settings-abschnitt">
-      <span class="settings-titel">Projekt-Server</span>
-      <div class="settings-eingabe-zeile">
-        <input type="url" id="server-url" placeholder="https://tagebuch.deinedomain.com" autocomplete="off" spellcheck="false">
-        <button id="btn-save-server" class="wichtig">Speichern</button>
-      </div>
-      <span class="settings-hinweis">Wird lokal im Browser gespeichert.</span>
-    </div>
-
-    <!-- Push-Erinnerungen -->
-    <div class="settings-abschnitt">
-      <span class="settings-titel">Erinnerung</span>
-      <div class="settings-schalter-zeile">
-        <div class="settings-schalter-beschriftung">
-          <div class="titel">Tägliche Benachrichtigung</div>
-          <div class="untertitel">Erinnert dich an deinen Tagebucheintrag</div>
-        </div>
-        <label class="schalter">
-          <input type="checkbox" id="reminder-toggle">
-          <span class="schieber"></span>
-        </label>
-      </div>
-
-      <div id="settings-time-box" class="settings-uhrzeit-zeile versteckt">
-        <label for="reminder-time">Uhrzeit</label>
-        <input type="time" id="reminder-time" value="20:00">
-      </div>
-
-      <div id="settings-status"></div>
-    </div>
-  </div>
-</div>
-
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 // ============ EINSTELLUNGEN ============
 
-let CONFIG = {
+const CONFIG = {
 
   CLIENT_ID: '162999381232-kmusrtl8hsnp8ilr8dg71pb7q9udobnm.apps.googleusercontent.com',
 
@@ -816,16 +551,26 @@ let CONFIG = {
   // denselben Wochentag. Nach acht Wochen war jeder einmal überall.
   //
   // null steht für den Pausentag.
-  REIHENFOLGE: [],
+  REIHENFOLGE: [
+    'fabian', 'lennart', 'joshua', 'dario', 'benni', 'jarno', 'timo', null
+  ],
 
   // Erster Tag des Zyklus – an diesem Tag ist der erste Name dran.
-  ZYKLUS_START: '',
+  ZYKLUS_START: '2026-08-10',
 
   // Die Projekt-Konten. Meldet sich jemand mit seinem privaten Konto
   // an, warnt die Seite: Dort ist meist kaum Platz frei, und das
   // Video zählte gegen den eigenen Speicher.
   // Leer lassen schaltet die Prüfung ab.
-  KONTEN_HASHES: [],
+  KONTEN: [
+    'speicherplatzfurvlogs@gmail.com',
+    'auskunftgesucht@gmail.com',
+    'tagebuch.timo2026@gmail.com',
+    'tagebuch.benni2026@gmail.com',
+    'tagebuch.jarno2026@gmail.com',
+    'tagebuch.joshua2026@gmail.com',
+    'dario.lichtner@yahoo.com'
+  ],
 
   // Ab wie wenig freiem Speicher gewarnt wird (in GB).
   SPEICHER_WARNUNG_GB: 2,
@@ -867,159 +612,25 @@ let CONFIG = {
   // ein zentrales Skript. Fremde Dateien werden nie angefasst.
   AUTO_LOESCHEN: true,
 
+  // Punktestand.
+  //
+  // Ein Punkt pro hochgeladenem Bild oder Video, aber höchstens fünf
+  // pro Woche. Die Obergrenze ist wichtig: Ohne sie gewinnt, wer
+  // sein Video in zwanzig Schnipsel zerlegt, statt wer regelmäßig
+  // dabei ist.
+  //
+  // Weil die Videos nach 30 Tagen verschwinden, lässt sich "Gesamt"
+  // nicht aus Drive ausrechnen. Jede Person hat deshalb eine kleine
+  // Datei im Hauptordner mit ihren Tagen. Eine Datei pro Person
+  // bedeutet: Niemand überschreibt jemandem die Punkte.
+  PUNKTE_PRAEFIX: '_punkte-',
+  PUNKTE_PRO_WOCHE: 5,
+
   // Vollzugriff auf Drive. Der eingeschränkte Bereich drive.file
   // dürfte nur Dateien anfassen, die die App selbst angelegt hat –
   // dann sähe niemand die Videos der anderen.
   BEREICH: 'https://www.googleapis.com/auth/drive'
 };
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(console.error);
-}
-async function loadServerConfig() {
-  const serverUrl = localStorage.getItem('tagebuch_server_url');
-
-  if (!serverUrl) {
-    console.warn("Keine Server-URL hinterlegt. Bitte in den Einstellungen eintragen.");
-    return false;
-  }
-
-  try {
-    const res = await fetch(`${serverUrl}/api/config`);
-    if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
-
-    const serverConfig = await res.json();
-
-    // Fill your existing CONFIG object with the data from the Raspberry Pi
-    CONFIG.REIHENFOLGE = serverConfig.reihenfolge || [];
-    CONFIG.ZYKLUS_START = serverConfig.zyklus_start || '';
-    CONFIG.KONTEN_HASHES = serverConfig.konten_hashes || [];
-    CONFIG.VAPID_PUBLIC_KEY = serverConfig.vapid_public_key || '';
-
-    return true;
-  } catch (err) {
-    console.error("Konnte Konfiguration vom Server nicht laden:", err);
-    return false;
-  }
-}
-
-const settingsBackdrop = document.getElementById('settings-backdrop');
-const statusDiv = document.getElementById('settings-status');
-
-document.getElementById('btn-open-settings').onclick = () => settingsBackdrop.classList.add('open');
-document.getElementById('btn-close-settings').onclick = () => settingsBackdrop.classList.remove('open');
-settingsBackdrop.onclick = (e) => { if (e.target === settingsBackdrop) settingsBackdrop.classList.remove('open'); };
-
-function setStatus(msg, err = false) {
-  statusDiv.textContent = msg;
-  statusDiv.className = err ? 'fehler' : 'ok';
-  statusDiv.style.display = 'block';
-  setTimeout(() => statusDiv.style.display = 'none', 4000);
-}
-
-// Save Server URL
-const sInput = document.getElementById('server-url');
-sInput.value = localStorage.getItem('tagebuch_server_url') || '';
-
-document.getElementById('btn-save-server').onclick = async () => {
-  let val = sInput.value.trim().replace(/\/+$/, '');
-  if (!val) return;
-  localStorage.setItem('tagebuch_server_url', val);
-  setStatus('Gespeichert. Lade Daten...');
-
-  const ok = await loadServerConfig();
-  if (ok) {
-    if (typeof initialisiereAnzeige === 'function') initialisiereAnzeige();
-    else if (typeof init === 'function') init();
-    setStatus('Konfiguration geladen!');
-  } else {
-    setStatus('Server nicht erreichbar', true);
-  }
-};
-
-// Notification Toggle & Time Selection
-const rToggle = document.getElementById('reminder-toggle');
-const rTimeBox = document.getElementById('settings-time-box');
-const rTime = document.getElementById('reminder-time');
-
-navigator.serviceWorker?.ready.then(async (reg) => {
-  const sub = await reg.pushManager.getSubscription();
-  if (sub) {
-    rToggle.checked = true;
-    rTimeBox.classList.remove('versteckt');
-  }
-  rTime.value = localStorage.getItem('tagebuch_reminder_time') || '20:00';
-});
-
-rToggle.onchange = async () => {
-  if (rToggle.checked) {
-    rTimeBox.classList.remove('versteckt');
-    await registerPush();
-  } else {
-    rTimeBox.classList.add('versteckt');
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    if (sub) await sub.unsubscribe();
-    setStatus('Erinnerung deaktiviert');
-  }
-};
-
-rTime.onchange = () => {
-  if (rToggle.checked) registerPush();
-};
-
-async function registerPush() {
-  const url = localStorage.getItem('tagebuch_server_url');
-  if (!url || !CONFIG.VAPID_PUBLIC_KEY) {
-    setStatus('Erst Server-URL speichern!', true);
-    rToggle.checked = false;
-    rTimeBox.classList.add('versteckt');
-    return;
-  }
-  try {
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') {
-      setStatus('Berechtigung verweigert', true);
-      rToggle.checked = false;
-      return;
-    }
-
-    const reg = await navigator.serviceWorker.ready;
-    const padding = '='.repeat((4 - (CONFIG.VAPID_PUBLIC_KEY.length % 4)) % 4);
-    const key = (CONFIG.VAPID_PUBLIC_KEY + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const raw = window.atob(key);
-    const keyArr = Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
-
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: keyArr
-    });
-    localStorage.setItem('tagebuch_reminder_time', rTime.value);
-
-    await fetch(`${url}/api/subscribe`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subscription: sub,
-        time: rTime.value,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      })
-    });
-    setStatus(`Aktiv für ${rTime.value} Uhr`);
-  } catch (err) {
-    console.error(err);
-    setStatus('Fehler beim Aktivieren', true);
-    rToggle.checked = false;
-  }
-}
-
-// On Startup: Try loading config; if missing, automatically open the settings dialog
-window.addEventListener('DOMContentLoaded', async () => {
-  const ok = await loadServerConfig();
-  if (!ok) {
-    settingsBackdrop.classList.add('open');
-  }
-});
 
 const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli',
@@ -1062,6 +673,7 @@ const el = {
   zeitleiste:document.getElementById('zeitleiste'),
   woche:     document.getElementById('woche'),
   uebersicht:document.getElementById('uebersicht'),
+  punkte:    document.getElementById('punkte'),
   zahlen:    document.getElementById('zahlen'),
   raster:    document.getElementById('raster'),
   overlay:   document.getElementById('overlay'),
@@ -1190,14 +802,6 @@ async function angemeldet() {
   if (await zeigeKonto()) laden();
 }
 
-async function sha256(text) {
-  const buffer = new TextEncoder().encode(text.toLowerCase().trim());
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 /**
  * Wer ist gerade angemeldet? Wird angezeigt und gegen die Liste der
  * Projekt-Konten geprüft.
@@ -1223,9 +827,7 @@ async function zeigeKonto() {
   el.konto.textContent = meineMail
     + (frei === null ? '' : ' · ' + frei.toFixed(1).replace('.', ',') + ' GB frei');
 
-  const meineMailHash = await sha256(meineMail);
-
-  if (CONFIG.KONTEN_HASHES && CONFIG.KONTEN_HASHES.length && !CONFIG.KONTEN_HASHES.includes(meineMailHash)) {
+  if (CONFIG.KONTEN.length && CONFIG.KONTEN.indexOf(meineMail) === -1) {
     // Nicht merken – sonst schlägt die Seite beim nächsten Mal
     // wieder dasselbe falsche Konto vor.
     el.konto.classList.add('falsch');
@@ -1275,12 +877,20 @@ window.onload = function () {
             zeigeFehler('Anmeldung fehlgeschlagen: ' + antwort.error);
           }
           leiseAnmeldung = false;
+          // Wartende Uploads nicht hängen lassen
+          tokenAufloeser.splice(0).forEach(function (f) { f(null); });
           return;
         }
         leiseAnmeldung = false;
         token = antwort.access_token;
         merkeZugang(antwort);
-        angemeldet();
+
+        // Ein Upload, der auf einen frischen Schlüssel wartet, kann weiter
+        const wartende = tokenAufloeser.splice(0);
+        wartende.forEach(function (f) { f(token); });
+
+        // Nur neu laden, wenn das keine Erneuerung mitten im Upload war
+        if (!wartende.length) angemeldet();
       }
     });
 
@@ -1415,6 +1025,11 @@ async function dateienHolen() {
   return ergebnis;
 }
 
+/** Trennt die Punktedateien von den Videos. */
+function istPunktedatei(datei) {
+  return (datei.name || '').indexOf(CONFIG.PUNKTE_PRAEFIX) === 0;
+}
+
 async function laden() {
   el.fehler.hidden = true;
   el.status.hidden = false;
@@ -1423,9 +1038,18 @@ async function laden() {
   try {
     unterordner = await ordnerHolen();
     fuellePersonen();
-    dateien = await dateienHolen();
+
+    const alles = await dateienHolen();
+
+    // Punktedateien raus: Sie sind keine Videos, dürfen nicht in der
+    // Zeitleiste auftauchen und vor allem nicht nach 30 Tagen
+    // gelöscht werden.
+    punkteDateien = alles.filter(istPunktedatei);
+    dateien = alles.filter(function (d) { return !istPunktedatei(d); });
 
     if (CONFIG.AUTO_LOESCHEN) await aufraeumen();
+
+    await punkteLaden();
 
     kommentare = {};
     await kommentareVorladen(alleAnker());
@@ -1757,6 +1381,7 @@ function tagSpalte(tag, heuteSchluessel) {
 
 function zeichneUebersicht() {
   el.uebersicht.hidden = false;
+  zeichnePunkte();
 
   // ---- Kennzahlen ----
   let faellig = 0, geliefert = 0, bytes = 0;
@@ -1969,6 +1594,469 @@ function spielLeiste(datei, url) {
 
   return l;
 }
+
+// ============ PUNKTE ============
+//
+// Ein Punkt pro Tag, an dem jemand etwas beigesteuert hat.
+//
+// Gespeichert wird in Drive, eine Datei pro Person, im Hauptordner:
+//   _punkte-fabian.json  →  { "tage": ["2026-08-10", "2026-08-18"] }
+//
+// Warum eine Datei pro Person und nicht eine gemeinsame: Bei einer
+// gemeinsamen würden sich zwei gleichzeitige Uploads gegenseitig
+// überschreiben. So schreibt jeder nur in seine eigene.
+//
+// Warum überhaupt eine Datei: Die Videos verschwinden nach 30 Tagen.
+// Ohne eigene Ablage gäbe es keine Gesamtwertung.
+
+let punkteDateien = [];   // die Drive-Dateien
+let punkte = {};          // name → { id, tage: { '2026-11-10': 3 } }
+
+/** Montag der Woche als Schlüssel – dient der Wochengrenze. */
+function wochenSchluessel(tag) {
+  return schluessel(montagVon(new Date(tag + 'T12:00:00')));
+}
+
+function wochenSumme(tage, tag) {
+  const woche = wochenSchluessel(tag);
+  let summe = 0;
+  Object.keys(tage).forEach(function (t) {
+    if (wochenSchluessel(t) === woche) summe += tage[t];
+  });
+  return summe;
+}
+
+async function punkteLaden() {
+  punkte = {};
+
+  await Promise.all(punkteDateien.map(async function (datei) {
+    const name = datei.name
+      .slice(CONFIG.PUNKTE_PRAEFIX.length)
+      .replace(/\.json$/i, '');
+
+    try {
+      const antwort = await fetch(
+        'https://www.googleapis.com/drive/v3/files/' + datei.id + '?alt=media',
+        { headers: { Authorization: 'Bearer ' + token } }
+      );
+      if (!antwort.ok) return;
+      const inhalt = await antwort.json();
+
+      // Die erste Fassung speicherte nur eine Liste von Tagen mit je
+      // einem Punkt. Die wird hier mitgelesen.
+      let tage = inhalt.tage || {};
+      if (Array.isArray(tage)) {
+        const umgebaut = {};
+        tage.forEach(function (t) { umgebaut[t] = 1; });
+        tage = umgebaut;
+      }
+
+      punkte[name] = { id: datei.id, tage: tage };
+    } catch (e) { /* kaputte Datei ignorieren, nicht alles abbrechen */ }
+  }));
+
+  // Wer noch keine Datei hat, bekommt seinen Stand aus dem, was
+  // gerade in Drive liegt – sonst stünde jeder bei null, obwohl er
+  // seit Wochen dabei ist.
+  CONFIG.REIHENFOLGE.forEach(function (name) {
+    if (!name || punkte[name]) return;
+    punkte[name] = { id: null, tage: ausDriveZaehlen(name) };
+  });
+}
+
+/** Zählt die vorhandenen Dateien pro Tag, mit Wochengrenze. */
+function ausDriveZaehlen(name) {
+  const ordner = ordnerFuer(name);
+  if (!ordner) return {};
+
+  const roh = {};
+  dateien.forEach(function (d) {
+    if (d.ordner !== ordner.name) return;
+    roh[d.tagSchluessel] = (roh[d.tagSchluessel] || 0) + 1;
+  });
+
+  // Woche für Woche deckeln
+  const tage = {};
+  Object.keys(roh).sort().forEach(function (t) {
+    const rest = CONFIG.PUNKTE_PRO_WOCHE - wochenSumme(tage, t);
+    const wert = Math.max(0, Math.min(roh[t], rest));
+    if (wert) tage[t] = wert;
+  });
+  return tage;
+}
+
+/**
+ * Trägt Punkte ein und schreibt die Datei zurück nach Drive.
+ * Gibt zurück, wie viele tatsächlich gezählt wurden – durch die
+ * Wochengrenze können das weniger sein als hochgeladen.
+ */
+async function punktVermerken(name, tag, anzahl) {
+  if (!name || !tag || !anzahl) return 0;
+
+  const eintrag = punkte[name] || (punkte[name] = { id: null, tage: {} });
+  const schon = wochenSumme(eintrag.tage, tag);
+  const rest = Math.max(0, CONFIG.PUNKTE_PRO_WOCHE - schon);
+  const zusatz = Math.min(anzahl, rest);
+
+  if (!zusatz) return 0;
+
+  eintrag.tage[tag] = (eintrag.tage[tag] || 0) + zusatz;
+
+  const inhalt = JSON.stringify({ tage: eintrag.tage }, null, 2);
+
+  try {
+    if (eintrag.id) await punkteSchreiben(eintrag.id, inhalt);
+    else eintrag.id = await punkteDateiAnlegen(name, inhalt);
+  } catch (e) {
+    // Punkte sind Beiwerk – ein Fehler hier darf den Upload nicht
+    // nachträglich als gescheitert erscheinen lassen.
+    console.warn('Punkte konnten nicht gespeichert werden:', e);
+  }
+  return zusatz;
+}
+
+async function punkteDateiAnlegen(name, inhalt) {
+  const antwort = await fetch(
+    'https://www.googleapis.com/drive/v3/files?fields=id',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: CONFIG.PUNKTE_PRAEFIX + name + '.json',
+        parents: [CONFIG.ORDNER_ID],
+        mimeType: 'application/json'
+      })
+    }
+  );
+  if (!antwort.ok) throw new Error('Punktedatei konnte nicht angelegt werden.');
+
+  const id = (await antwort.json()).id;
+  await punkteSchreiben(id, inhalt);
+  return id;
+}
+
+function punkteSchreiben(id, inhalt) {
+  return fetch(
+    'https://www.googleapis.com/upload/drive/v3/files/' + id + '?uploadType=media',
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      },
+      body: inhalt
+    }
+  ).then(function (a) {
+    if (!a.ok) throw new Error('Punkte konnten nicht geschrieben werden.');
+  });
+}
+
+
+// ---- Auswertung ----
+
+function punkteStand() {
+  const jetzt = new Date();
+  const monatsPraefix = jetzt.getFullYear() + '-'
+    + String(jetzt.getMonth() + 1).padStart(2, '0');
+
+  return CONFIG.REIHENFOLGE
+    .filter(function (n) { return !!n; })
+    .map(function (name) {
+      const tage = (punkte[name] || {}).tage || {};
+      let monat = 0, gesamt = 0;
+      Object.keys(tage).forEach(function (t) {
+        gesamt += tage[t];
+        if (t.indexOf(monatsPraefix) === 0) monat += tage[t];
+      });
+      return { name: name, monat: monat, gesamt: gesamt };
+    });
+}
+
+/** Punkte der angemeldeten Person – daraus werden die Leben im Spiel. */
+function meinePunkte() {
+  const name = meinName();
+  if (!name) return 0;
+  const eintrag = punkteStand().find(function (e) {
+    return e.name.toLowerCase() === name.toLowerCase();
+  });
+  return eintrag ? eintrag.gesamt : 0;
+}
+
+function rangliste(feld) {
+  return punkteStand()
+    .slice()
+    .sort(function (a, b) {
+      if (b[feld] !== a[feld]) return b[feld] - a[feld];
+      return a.name < b.name ? -1 : 1;
+    });
+}
+
+function zeichnePunkte() {
+  const monat = rangliste('monat');
+  const gesamt = rangliste('gesamt');
+
+  el.punkte.innerHTML = '';
+  el.punkte.appendChild(tabelle('Dieser Monat', monat, 'monat'));
+  el.punkte.appendChild(tabelle('Gesamt', gesamt, 'gesamt'));
+}
+
+function tabelle(titel, liste, feld) {
+  const kasten = document.createElement('div');
+  kasten.className = 'bestenliste';
+
+  const kopf = document.createElement('h3');
+  kopf.textContent = titel;
+  kasten.appendChild(kopf);
+
+  const t = document.createElement('table');
+
+  liste.forEach(function (eintrag, i) {
+    // Gleichstand bekommt denselben Platz
+    const platz = (i > 0 && liste[i - 1][feld] === eintrag[feld])
+      ? '' : (i + 1) + '.';
+
+    const zeile = document.createElement('tr');
+    if (meinName() && eintrag.name.toLowerCase() === meinName().toLowerCase()) {
+      zeile.className = 'ich';
+    }
+    zeile.innerHTML =
+        '<td class="platz">' + platz + '</td>'
+      + '<td class="wer">' + escape_(eintrag.name) + '</td>'
+      + '<td class="wert">' + eintrag[feld] + '</td>';
+    t.appendChild(zeile);
+  });
+
+  kasten.appendChild(t);
+  return kasten;
+}
+
+
+// ============ SPIEL ============
+//
+// Ein Sprungspiel für die Wartezeit beim Hochladen. Eigene Figur,
+// eigene Hindernisse – kein Nachbau eines fremden Spiels.
+//
+// Die Leben kommen aus den gesammelten Punkten. Verbraucht werden
+// sie nicht: Sonst müsste man sich zwischen Bestenliste und Spielen
+// entscheiden, und die Bestenliste wäre nichts mehr wert. Wer mehr
+// hochlädt, hält im Spiel länger durch – das reicht als Anreiz.
+
+const SPIEL = {
+  BODEN: 24,          // Abstand der Standlinie vom unteren Rand
+  SCHWERKRAFT: 2100,  // Pixel pro Sekunde²
+  SPRUNG: 620,
+  START_TEMPO: 230,
+  MAX_TEMPO: 560,
+  FIGUR: 26
+};
+
+let spielLauf = null;
+
+function spielStarten() {
+  if (spielLauf) return;
+
+  el.spiel.hidden = false;
+  const leinwand = el.spielFeld;
+  const ctx = leinwand.getContext('2d');
+
+  const lebenStart = Math.max(1, meinePunkte());
+
+  const zustand = {
+    y: 0, vy: 0,
+    tempo: SPIEL.START_TEMPO,
+    strecke: 0,
+    hindernisse: [],
+    naechstes: 420,
+    leben: lebenStart,
+    unverwundbar: 0,
+    vorbei: false,
+    laeuft: true
+  };
+
+  function groesseAnpassen() {
+    const dpr = window.devicePixelRatio || 1;
+    const breite = leinwand.clientWidth || 320;
+    const hoehe = leinwand.clientHeight || 170;
+    leinwand.width = Math.round(breite * dpr);
+    leinwand.height = Math.round(hoehe * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    zustand.breite = breite;
+    zustand.hoehe = hoehe;
+  }
+  groesseAnpassen();
+  window.addEventListener('resize', groesseAnpassen);
+
+  function springen() {
+    if (zustand.vorbei) { neustart(); return; }
+    if (zustand.y === 0) zustand.vy = SPIEL.SPRUNG;
+  }
+
+  function neustart() {
+    zustand.y = 0; zustand.vy = 0;
+    zustand.tempo = SPIEL.START_TEMPO;
+    zustand.strecke = 0;
+    zustand.hindernisse = [];
+    zustand.naechstes = 420;
+    zustand.leben = Math.max(1, meinePunkte());
+    zustand.unverwundbar = 0;
+    zustand.vorbei = false;
+  }
+
+  function taste(e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp') {
+      e.preventDefault();
+      springen();
+    }
+  }
+
+  leinwand.addEventListener('pointerdown', springen);
+  document.addEventListener('keydown', taste);
+
+  let vorher = performance.now();
+
+  function bild(jetzt) {
+    if (!zustand.laeuft) return;
+    const dt = Math.min((jetzt - vorher) / 1000, 0.05);
+    vorher = jetzt;
+
+    if (!zustand.vorbei) {
+      rechnen(zustand, dt);
+    }
+    zeichnen(ctx, zustand);
+    spielLauf = requestAnimationFrame(bild);
+  }
+  spielLauf = requestAnimationFrame(bild);
+
+  // Zum Aufräumen beim Schließen
+  el.spiel._beenden = function () {
+    zustand.laeuft = false;
+    cancelAnimationFrame(spielLauf);
+    spielLauf = null;
+    window.removeEventListener('resize', groesseAnpassen);
+    document.removeEventListener('keydown', taste);
+    leinwand.removeEventListener('pointerdown', springen);
+    el.spiel.hidden = true;
+  };
+}
+
+function spielBeenden() {
+  if (el.spiel._beenden) el.spiel._beenden();
+  else el.spiel.hidden = true;
+}
+
+function rechnen(z, dt) {
+  // Sprung
+  z.vy -= SPIEL.SCHWERKRAFT * dt;
+  z.y += z.vy * dt;
+  if (z.y <= 0) { z.y = 0; z.vy = 0; }
+
+  // Tempo zieht langsam an
+  z.tempo = Math.min(SPIEL.MAX_TEMPO, z.tempo + 9 * dt);
+  z.strecke += z.tempo * dt;
+  if (z.unverwundbar > 0) z.unverwundbar -= dt;
+
+  // Hindernisse
+  z.naechstes -= z.tempo * dt;
+  if (z.naechstes <= 0) {
+    const hoch = Math.random() < 0.3;
+    z.hindernisse.push({
+      x: z.breite + 20,
+      b: hoch ? 12 : 16,
+      h: hoch ? 42 : 26
+    });
+    // Abstand so wählen, dass es immer schaffbar bleibt
+    z.naechstes = 260 + Math.random() * 220 + z.tempo * 0.25;
+  }
+
+  z.hindernisse.forEach(function (h) { h.x -= z.tempo * dt; });
+  z.hindernisse = z.hindernisse.filter(function (h) { return h.x + h.b > -10; });
+
+  // Zusammenstoß
+  const fx = 34, fb = SPIEL.FIGUR;
+  z.hindernisse.forEach(function (h) {
+    if (h.getroffen) return;
+    const ueberlapptX = fx + fb > h.x + 3 && fx < h.x + h.b - 3;
+    const ueberlapptY = z.y < h.h - 4;
+    if (ueberlapptX && ueberlapptY) {
+      h.getroffen = true;
+      if (z.unverwundbar > 0) return;
+      z.leben--;
+      z.unverwundbar = 1.2;
+      if (z.leben <= 0) z.vorbei = true;
+    }
+  });
+}
+
+function zeichnen(ctx, z) {
+  const b = z.breite, h = z.hoehe;
+  const bodenY = h - SPIEL.BODEN;
+
+  ctx.clearRect(0, 0, b, h);
+  ctx.fillStyle = '#faf9f5';
+  ctx.fillRect(0, 0, b, h);
+
+  // Standlinie als Strichfolge, die mitläuft
+  ctx.strokeStyle = '#d5d1c4';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const versatz = -(z.strecke % 24);
+  for (let x = versatz; x < b; x += 24) {
+    ctx.moveTo(x, bodenY + 0.5);
+    ctx.lineTo(x + 14, bodenY + 0.5);
+  }
+  ctx.stroke();
+
+  // Hindernisse: schlichte Pfosten
+  ctx.fillStyle = '#b5b1a3';
+  z.hindernisse.forEach(function (o) {
+    ctx.fillRect(Math.round(o.x), Math.round(bodenY - o.h), o.b, o.h);
+  });
+
+  // Figur: eine kleine Kamera
+  const fx = 34;
+  const fy = bodenY - SPIEL.FIGUR - z.y;
+  const blinkt = z.unverwundbar > 0 && Math.floor(z.unverwundbar * 10) % 2 === 0;
+
+  ctx.globalAlpha = blinkt ? 0.35 : 1;
+  ctx.fillStyle = '#2c2b26';
+  ctx.beginPath();
+  ctx.roundRect(fx, fy, SPIEL.FIGUR, SPIEL.FIGUR - 4, 4);
+  ctx.fill();
+  // Sucher oben
+  ctx.fillRect(fx + 5, fy - 4, 9, 4);
+  // Linse
+  ctx.fillStyle = '#faf9f5';
+  ctx.beginPath();
+  ctx.arc(fx + SPIEL.FIGUR / 2, fy + (SPIEL.FIGUR - 4) / 2, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Punktestand und Leben
+  ctx.fillStyle = '#8a877c';
+  ctx.font = '12px system-ui, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(Math.floor(z.strecke / 10) + ' m', b - 8, 16);
+
+  ctx.textAlign = 'left';
+  ctx.fillText('Leben ' + Math.max(0, z.leben), 8, 16);
+
+  if (z.vorbei) {
+    ctx.fillStyle = 'rgba(250,249,245,.88)';
+    ctx.fillRect(0, 0, b, h);
+    ctx.fillStyle = '#2c2b26';
+    ctx.textAlign = 'center';
+    ctx.font = '15px Georgia, serif';
+    ctx.fillText('Vorbei – ' + Math.floor(z.strecke / 10) + ' m',
+                 b / 2, h / 2 - 4);
+    ctx.fillStyle = '#8a877c';
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillText('Tippen für neue Runde', b / 2, h / 2 + 16);
+  }
+}
+
 
 // ============ KOMMENTARE ============
 //
@@ -2593,30 +2681,78 @@ document.getElementById('absenden').onclick = async function () {
 
   const fuerTag = plusTage(new Date(), -Number(el.fuer.value || 0));
 
-  try {
-    // Nacheinander, nicht gleichzeitig – sonst konkurrieren die
-    // Uploads um dieselbe Leitung und alle werden langsamer.
-    for (let i = 0; i < entwurf.length; i++) {
-      const nummer = entwurf.length > 1
-        ? ' (' + (i + 1) + ' von ' + entwurf.length + ')' : '';
+  const gesamt = entwurf.length;
+  const fertige = [];
 
-      await hochladen(entwurf[i].datei, ordnerId, function (prozent) {
-        setzeBalken(prozent);
-        el.hlStatus.textContent = 'lädt hoch' + nummer + ' … ' + prozent + ' %';
-      }, fuerTag, i);
+  // Fortschritt über alle Dateien zusammen, weil mehrere gleichzeitig
+  // laufen. Jede meldet ihre gesendeten Bytes, hier wird summiert.
+  const gesamtBytes = entwurf.reduce(function (s, e) { return s + e.size; }, 0);
+  const stand = new Map();
+
+  function melde() {
+    let summe = 0;
+    stand.forEach(function (b) { summe += b; });
+    const prozent = gesamtBytes ? Math.min(100, Math.round(summe / gesamtBytes * 100)) : 0;
+    setzeBalken(prozent);
+    el.hlStatus.textContent = 'lädt hoch … ' + prozent + ' %'
+      + (gesamt > 1 ? ' (' + fertige.length + ' von ' + gesamt + ' fertig)' : '');
+  }
+
+  try {
+    // Zwei gleichzeitig: Eine einzelne Übertragung lastet die Leitung
+    // selten aus. Mehr als zwei bringt kaum noch etwas.
+    const warteschlange = entwurf.map(function (e, i) { return { eintrag: e, i: i }; });
+
+    async function arbeiter() {
+      while (warteschlange.length) {
+        const { eintrag, i } = warteschlange.shift();
+        await hochladen(eintrag.datei, ordnerId, function (bytes) {
+          stand.set(i, bytes);
+          melde();
+        }, fuerTag, i);
+
+        stand.set(i, eintrag.size);
+        fertige.push(eintrag);
+        melde();
+      }
     }
-    el.hlStatus.textContent = 'fertig';
-    leereEntwurf();
-    wochenStart = montagVon(new Date());
-    await laden();
+
+    await Promise.all(
+      Array.from({ length: Math.min(PARALLEL, entwurf.length) }, arbeiter)
+    );
+    // Ein Punkt pro Datei, gedeckelt auf fünf pro Woche
+    const bekommen = await punktVermerken(
+      meinName(), schluessel(fuerTag), fertige.length
+    );
+    el.hlStatus.textContent = bekommen
+      ? 'fertig · ' + bekommen + (bekommen === 1 ? ' Punkt' : ' Punkte')
+      : 'fertig · Wochengrenze erreicht';
+
   } catch (fehler) {
-    el.hlStatus.textContent = '';
+    el.hlStatus.textContent = fertige.length
+      ? fertige.length + ' von ' + gesamt + ' geschafft'
+      : '';
     zeigeFehler(fehler.message);
+
   } finally {
+    // Erfolgreiche aus der Liste nehmen. Sonst lädt ein erneuter
+    // Versuch sie ein zweites Mal hoch, und der Tag hätte doppelte
+    // Clips.
+    fertige.forEach(function (e) {
+      const i = entwurf.indexOf(e);
+      if (i !== -1) { URL.revokeObjectURL(e.url); entwurf.splice(i, 1); }
+    });
+    zeichneEntwurf();
+
     el.waehlen.disabled = false;
     el.balken.hidden = true;
-    el.fuer.value = '0';
+    if (!entwurf.length) el.fuer.value = '0';
     merkePerson();
+
+    if (fertige.length) {
+      wochenStart = montagVon(new Date());
+      await laden();
+    }
   }
 };
 
@@ -2630,57 +2766,279 @@ function uhrzeitMarke(lfdNr) {
        + String(lfdNr || 0).padStart(2, '0');
 }
 
-/**
- * Wiederaufnehmbarer Upload: erst eine Upload-Adresse anfordern,
- * dann geht die Datei direkt vom Browser zu Google. XMLHttpRequest
- * statt fetch, weil nur das einen Fortschritt meldet.
- */
+// ============ UPLOAD ============
+//
+// Google bietet für große Dateien ein Verfahren an, das sich nach
+// einem Abbruch fortsetzen lässt. Vorher haben wir nur die Hälfte
+// davon benutzt: eine Upload-Adresse geholt und dann die ganze Datei
+// am Stück geschickt. Riss die Verbindung bei 90 Prozent, war alles
+// umsonst – und genau das passiert auf dem Handy ständig, beim
+// Wechsel zwischen WLAN und Mobilfunk oder wenn der Bildschirm
+// ausgeht.
+//
+// Jetzt geht die Datei in Stücken raus. Bricht etwas ab, fragen wir
+// Google, wie viel angekommen ist, und machen dort weiter.
+
+// Stückgröße. Jedes Stück kostet eine volle Runde zum Server und
+// zurück – auf dem Handy mit hoher Latenz ist das spürbar. Deshalb
+// fangen wir bei 8 MB an und verdoppeln, solange es flott läuft.
+// Nach einem Abbruch wieder kleiner, damit nicht viel verloren geht.
+// Alle Werte sind Vielfache von 256 KiB, das verlangt Drive.
+const STUECK_START = 8 * 1024 * 1024;
+const STUECK_MAX   = 32 * 1024 * 1024;
+const STUECK_MIN   = 2 * 1024 * 1024;
+
+// Wie viele Dateien gleichzeitig. Eine einzelne Übertragung lastet
+// eine Mobilfunkverbindung selten aus – zwei parallel sind oft
+// deutlich schneller. Mehr bringt wenig und macht alles zäh, wenn
+// die Leitung doch schmal ist.
+const PARALLEL = 2;
+
+const MAX_VERSUCHE = 5;
+
+function warte(ms) {
+  return new Promise(function (f) { setTimeout(f, ms); });
+}
+
 async function hochladen(datei, ordnerId, fortschritt, fuerTag, lfdNr) {
   // Datum vorn für die Zuordnung zum Tag, danach eine Uhrzeit,
   // damit mehrere Clips in ihrer Reihenfolge bleiben.
   const name = schluessel(fuerTag || new Date()) + '_'
              + uhrzeitMarke(lfdNr) + '_' + datei.name;
 
-  const start = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'application/json; charset=UTF-8',
-        'X-Upload-Content-Type': datei.type || 'application/octet-stream',
-        'X-Upload-Content-Length': datei.size
-      },
-      body: JSON.stringify({ name: name, parents: [ordnerId] })
-    }
-  );
+  // Läuft der Zugang bald ab, vorher erneuern. Mitten im Upload
+  // abzulaufen ist der ärgerlichste Fall: Die Sitzung ist dann
+  // verloren und die Datei muss komplett neu hoch.
+  await tokenSichern();
 
-  if (!start.ok) {
-    throw new Error('Upload konnte nicht gestartet werden ('
-                    + start.status + '):\n' + (await start.text()));
+  const sitzung = await uploadSitzung(name, ordnerId, datei);
+  return await inStueckenSenden(sitzung, datei, fortschritt);
+}
+
+/** Fordert die Upload-Adresse an. Mit Wiederholung bei Netzfehlern. */
+async function uploadSitzung(name, ordnerId, datei) {
+  let letzterFehler;
+
+  for (let versuch = 0; versuch < 3; versuch++) {
+    try {
+      const start = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer ' + token,
+            'Content-Type': 'application/json; charset=UTF-8',
+            'X-Upload-Content-Type': datei.type || 'application/octet-stream',
+            'X-Upload-Content-Length': datei.size
+          },
+          body: JSON.stringify({ name: name, parents: [ordnerId] })
+        }
+      );
+
+      if (start.status === 401) {
+        await tokenSichern(true);
+        continue;
+      }
+      if (!start.ok) {
+        throw new Error(fehlertext(start.status, await start.text()));
+      }
+
+      const adresse = start.headers.get('Location');
+      if (!adresse) {
+        throw new Error('Google hat keine Upload-Adresse zurückgegeben.');
+      }
+      return adresse;
+
+    } catch (fehler) {
+      letzterFehler = fehler;
+      await warte(1000 * (versuch + 1));
+    }
+  }
+  throw letzterFehler || new Error('Upload konnte nicht gestartet werden.');
+}
+
+/** Schickt die Datei stückweise und nimmt nach Abbrüchen wieder auf. */
+async function inStueckenSenden(sitzung, datei, fortschritt) {
+  let offset = 0;
+  let versuche = 0;
+  let groesse = STUECK_START;
+
+  while (offset < datei.size) {
+    const ende = Math.min(offset + groesse, datei.size);
+    const begonnen = Date.now();
+
+    try {
+      const antwort = await stueckSenden(
+        sitzung, datei, offset, ende, fortschritt
+      );
+
+      if (antwort.status === 200 || antwort.status === 201) {
+        fortschritt(datei.size);
+        return JSON.parse(antwort.text || '{}');
+      }
+
+      if (antwort.status === 308) {
+        // Stück angekommen. Google sagt im Range-Kopf, wie weit es ist –
+        // ist der nicht lesbar, rechnen wir selbst weiter.
+        offset = standAusKopf(antwort.range, ende);
+        versuche = 0;
+
+        // Ging schnell? Dann größere Happen, das spart Wartezeit.
+        if (Date.now() - begonnen < 8000) {
+          groesse = Math.min(groesse * 2, STUECK_MAX);
+        }
+        continue;
+      }
+
+      if (antwort.status === 401) {
+        await tokenSichern(true);
+        offset = await standAbfragen(sitzung, datei.size);
+        continue;
+      }
+
+      // 4xx außer 401 sind endgültig – da hilft kein Wiederholen
+      if (antwort.status >= 400 && antwort.status < 500) {
+        throw new Error(fehlertext(antwort.status, antwort.text));
+      }
+
+      throw new Error('Unerwartete Antwort ' + antwort.status);
+
+    } catch (fehler) {
+      if (fehler.endgueltig) throw fehler;
+
+      // Kleinere Happen – bei wackliger Verbindung kommt so eher
+      // etwas durch, und ein Fehlschlag kostet weniger.
+      groesse = Math.max(Math.floor(groesse / 2 / 262144) * 262144, STUECK_MIN);
+
+      versuche++;
+      if (versuche > MAX_VERSUCHE) {
+        throw new Error('Upload abgebrochen nach ' + MAX_VERSUCHE
+          + ' Versuchen.\n' + fehler.message
+          + '\n\nDie Datei bleibt in der Liste, du kannst es erneut '
+          + 'versuchen – es wird nur der fehlende Rest geschickt.');
+      }
+
+      // Warten und nachfragen, wie viel wirklich angekommen ist
+      await warte(Math.min(1000 * Math.pow(2, versuche), 15000));
+      try {
+        offset = await standAbfragen(sitzung, datei.size);
+      } catch (e) { /* beim nächsten Durchlauf erneut */ }
+    }
   }
 
-  const sitzung = start.headers.get('Location');
-  if (!sitzung) throw new Error('Google hat keine Upload-Adresse zurückgegeben.');
+  // Alles geschickt, aber kein Abschluss gesehen – Stand holen
+  return {};
+}
 
+/**
+ * Ein einzelnes Stück. XMLHttpRequest statt fetch, weil nur das
+ * den Fortschritt während der Übertragung meldet.
+ */
+function stueckSenden(sitzung, datei, offset, ende, fortschritt) {
   return new Promise(function (fertig, fehlgeschlagen) {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', sitzung);
     xhr.setRequestHeader('Content-Type', datei.type || 'application/octet-stream');
+    xhr.setRequestHeader('Content-Range',
+      'bytes ' + offset + '-' + (ende - 1) + '/' + datei.size);
+    xhr.timeout = 120000;
 
+    // Meldet gesendete Bytes, nicht Prozent – bei mehreren Dateien
+    // gleichzeitig muss der Aufrufer selbst zusammenrechnen.
     xhr.upload.onprogress = function (e) {
-      if (e.lengthComputable) fortschritt(Math.round(e.loaded / e.total * 100));
+      if (e.lengthComputable) fortschritt(offset + e.loaded);
     };
+
     xhr.onload = function () {
-      if (xhr.status >= 200 && xhr.status < 300) fertig(JSON.parse(xhr.responseText || '{}'));
-      else fehlgeschlagen(new Error('Upload fehlgeschlagen ('
-                          + xhr.status + '):\n' + xhr.responseText));
+      fertig({
+        status: xhr.status,
+        text: xhr.responseText,
+        range: xhr.getResponseHeader('Range')
+      });
     };
     xhr.onerror = function () {
-      fehlgeschlagen(new Error('Netzwerkfehler beim Hochladen.'));
+      fehlgeschlagen(new Error('Verbindung unterbrochen.'));
     };
-    xhr.send(datei);
+    xhr.ontimeout = function () {
+      fehlgeschlagen(new Error('Zeitüberschreitung – Verbindung zu langsam.'));
+    };
+
+    xhr.send(datei.slice(offset, ende));
   });
+}
+
+/** "bytes=0-8388607" → 8388608 */
+function standAusKopf(range, rueckfall) {
+  const treffer = /bytes=0-(\d+)/.exec(range || '');
+  return treffer ? Number(treffer[1]) + 1 : rueckfall;
+}
+
+/** Fragt Google, wie viele Bytes bereits angekommen sind. */
+async function standAbfragen(sitzung, gesamt) {
+  const antwort = await fetch(sitzung, {
+    method: 'PUT',
+    headers: { 'Content-Range': 'bytes */' + gesamt }
+  });
+
+  if (antwort.status === 200 || antwort.status === 201) return gesamt;
+  if (antwort.status === 308) {
+    return standAusKopf(antwort.headers.get('Range'), 0);
+  }
+  if (antwort.status === 404) {
+    const weg = new Error('Die Upload-Sitzung ist abgelaufen. '
+                        + 'Bitte noch einmal versuchen.');
+    weg.endgueltig = true;
+    throw weg;
+  }
+  return 0;
+}
+
+/** Verständliche Meldungen statt roher Google-Antworten. */
+function fehlertext(status, roh) {
+  if (status === 403 && /storageQuotaExceeded|quota/i.test(roh || '')) {
+    return 'Der Speicher dieses Kontos ist voll. '
+         + 'In Drive aufräumen oder ein anderes Projekt-Konto nehmen.';
+  }
+  if (status === 403) {
+    return 'Keine Schreibrechte für diesen Ordner.';
+  }
+  if (status === 404) {
+    return 'Der Zielordner wurde nicht gefunden. '
+         + 'Wurde er umbenannt oder die Freigabe entfernt?';
+  }
+  return 'Fehler ' + status + ':\n' + (roh || '').slice(0, 300);
+}
+
+
+// ---- Zugang rechtzeitig erneuern ----
+//
+// Der Schlüssel von Google gilt eine Stunde. Läuft er mitten im
+// Upload ab, ist die Sitzung verloren. Deshalb vorher prüfen.
+
+let tokenAufloeser = [];
+
+function neuesTokenHolen() {
+  return new Promise(function (aufloesen) {
+    tokenAufloeser.push(aufloesen);
+    stillAnmelden();
+    setTimeout(function () {
+      const i = tokenAufloeser.indexOf(aufloesen);
+      if (i !== -1) { tokenAufloeser.splice(i, 1); aufloesen(null); }
+    }, 10000);
+  });
+}
+
+async function tokenSichern(erzwingen) {
+  let restzeit = 0;
+  try {
+    const z = JSON.parse(sessionStorage.getItem('videotagebuch.zugang') || '{}');
+    restzeit = (z.bis || 0) - Date.now();
+  } catch (e) {}
+
+  // Zehn Minuten Puffer: länger dauert auch ein großer Upload nicht
+  if (!erzwingen && restzeit > 10 * 60 * 1000) return;
+
+  await neuesTokenHolen();
 }
 
 function fuellePersonen() {
