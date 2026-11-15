@@ -364,11 +364,43 @@
   #raster .legende { font-size: .72rem; color: var(--grau); padding-top: .6rem; }
 
   /* ---- Bestenlisten ---- */
+  #listen {
+    position: fixed;
+    inset: 0;
+    background: rgba(20,19,17,.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 60;
+  }
+  #listen-inhalt {
+    background: var(--flaeche);
+    border-radius: 6px;
+    padding: 1.1rem 1.25rem 1.4rem;
+    max-width: 620px;
+    width: 100%;
+    max-height: 100%;
+    overflow: auto;
+  }
+  .listen-kopf {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--rand);
+    padding-bottom: .5rem;
+    margin-bottom: 1.1rem;
+  }
+  .listen-kopf h2 {
+    font-family: var(--serif);
+    font-size: 1.25rem;
+    font-weight: normal;
+    margin: 0;
+  }
   #punkte {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1.5rem;
-    margin-bottom: 1.75rem;
   }
   .bestenliste h3 {
     font-family: var(--serif);
@@ -506,6 +538,7 @@
   <button id="anmelden" class="wichtig">Mit Google anmelden</button>
   <button id="ansicht" class="leise" hidden>Wochenraster</button>
   <button id="neuladen" class="leise" hidden>Neu laden</button>
+  <button id="listenknopf" class="leise" hidden>Bestenliste</button>
   <button id="wechseln" class="leise" hidden>Konto wechseln</button>
   <button id="handyknopf" class="leise">Handy-Ansicht</button>
   <span id="konto"></span>
@@ -566,10 +599,19 @@
 <div id="woche" hidden></div>
 
 <section id="uebersicht" hidden>
-  <div id="punkte"></div>
   <div id="zahlen"></div>
   <table id="raster"></table>
 </section>
+
+<div id="listen" hidden>
+  <div id="listen-inhalt">
+    <div class="listen-kopf">
+      <h2>Bestenliste</h2>
+      <button id="listenzu" class="leise symbol" title="Schließen">&times;</button>
+    </div>
+    <div id="punkte"></div>
+  </div>
+</div>
 
 <div id="overlay" hidden><div id="overlay-inhalt"></div></div>
 
@@ -683,6 +725,11 @@ const CONFIG = {
   PUNKTE_PRAEFIX: '_punkte-',
   PUNKTE_PRO_WOCHE: 5,
 
+  // Spielmarken. Jede Runde kostet eine, jeder Punkt bringt eine.
+  // Zum Anfang gibt es ein paar geschenkt, damit niemand vor einer
+  // verschlossenen Tür steht, bevor er das erste Mal hochgeladen hat.
+  START_TOKENS: 3,
+
   // Vollzugriff auf Drive. Der eingeschränkte Bereich drive.file
   // dürfte nur Dateien anfassen, die die App selbst angelegt hat –
   // dann sähe niemand die Videos der anderen.
@@ -708,6 +755,8 @@ const el = {
   anmelden:  document.getElementById('anmelden'),
   konto:     document.getElementById('konto'),
   wechseln:  document.getElementById('wechseln'),
+  listen:    document.getElementById('listen'),
+  listenKnopf: document.getElementById('listenknopf'),
   ansicht:   document.getElementById('ansicht'),
   neuladen:  document.getElementById('neuladen'),
   status:    document.getElementById('status'),
@@ -1460,9 +1509,22 @@ function tagSpalte(tag, heuteSchluessel) {
 
 // ============ BELEGUNGSÜBERSICHT ============
 
+// Bestenliste als eigenes Fenster über den Kopf-Knopf
+el.listenKnopf.onclick = function () {
+  zeichnePunkte();
+  el.listen.hidden = false;
+};
+document.getElementById('listenzu').onclick = function () {
+  el.listen.hidden = true;
+};
+el.listen.onclick = function (e) {
+  if (e.target === el.listen) el.listen.hidden = true;
+};
+
 function zeichneUebersicht() {
   el.uebersicht.hidden = false;
-  zeichnePunkte();
+  el.listenKnopf.hidden = false;
+  spielKopfAktualisieren();      // Marken können sich geändert haben
 
   // ---- Kennzahlen ----
   let faellig = 0, geliefert = 0, bytes = 0;
@@ -1732,7 +1794,12 @@ async function punkteLaden() {
         tage = umgebaut;
       }
 
-      punkte[name] = { id: datei.id, tage: tage };
+      punkte[name] = {
+        id: datei.id,
+        tage: tage,
+        gespielt: inhalt.gespielt || 0,
+        bestwert: inhalt.bestwert || 0
+      };
     } catch (e) { /* kaputte Datei ignorieren, nicht alles abbrechen */ }
   }));
 
@@ -1741,9 +1808,48 @@ async function punkteLaden() {
   // seit Wochen dabei ist.
   CONFIG.REIHENFOLGE.forEach(function (name) {
     if (!name || punkte[name]) return;
-    punkte[name] = { id: null, tage: ausDriveZaehlen(name) };
+    punkte[name] = {
+      id: null, tage: ausDriveZaehlen(name), gespielt: 0, bestwert: 0
+    };
   });
 }
+
+function punkteEintrag(name) {
+  if (!punkte[name]) {
+    punkte[name] = { id: null, tage: {}, gespielt: 0, bestwert: 0 };
+  }
+  return punkte[name];
+}
+
+/** Schreibt den kompletten Stand einer Person zurück nach Drive. */
+async function punkteSpeichern(name) {
+  const e = punkteEintrag(name);
+  const inhalt = JSON.stringify({
+    tage: e.tage,
+    gespielt: e.gespielt,
+    bestwert: e.bestwert
+  }, null, 2);
+
+  try {
+    if (e.id) await punkteSchreiben(e.id, inhalt);
+    else e.id = await punkteDateiAnlegen(name, inhalt);
+  } catch (fehler) {
+    // Punkte sind Beiwerk – ein Fehler hier darf nichts anderes
+    // scheitern lassen.
+    console.warn('Punktestand konnte nicht gespeichert werden:', fehler);
+  }
+}
+
+/** Verdiente Punkte minus gespielte Runden, plus Startguthaben. */
+function tokenStand(name) {
+  if (!name || !punkte[name]) return 0;
+  const e = punkte[name];
+  let verdient = 0;
+  Object.keys(e.tage).forEach(function (t) { verdient += e.tage[t]; });
+  return CONFIG.START_TOKENS + verdient - (e.gespielt || 0);
+}
+
+function meineTokens() { return tokenStand(meinName()); }
 
 /** Zählt die vorhandenen Dateien pro Tag, mit Wochengrenze. */
 function ausDriveZaehlen(name) {
@@ -1782,17 +1888,7 @@ async function punktVermerken(name, tag, anzahl) {
   if (!zusatz) return 0;
 
   eintrag.tage[tag] = (eintrag.tage[tag] || 0) + zusatz;
-
-  const inhalt = JSON.stringify({ tage: eintrag.tage }, null, 2);
-
-  try {
-    if (eintrag.id) await punkteSchreiben(eintrag.id, inhalt);
-    else eintrag.id = await punkteDateiAnlegen(name, inhalt);
-  } catch (e) {
-    // Punkte sind Beiwerk – ein Fehler hier darf den Upload nicht
-    // nachträglich als gescheitert erscheinen lassen.
-    console.warn('Punkte konnten nicht gespeichert werden:', e);
-  }
+  await punkteSpeichern(name);
   return zusatz;
 }
 
@@ -1852,7 +1948,12 @@ function punkteStand() {
         gesamt += tage[t];
         if (t.indexOf(monatsPraefix) === 0) monat += tage[t];
       });
-      return { name: name, monat: monat, gesamt: gesamt };
+      return {
+        name: name,
+        monat: monat,
+        gesamt: gesamt,
+        best: (punkte[name] || {}).bestwert || 0
+      };
     });
 }
 
@@ -1876,15 +1977,16 @@ function rangliste(feld) {
 }
 
 function zeichnePunkte() {
-  const monat = rangliste('monat');
-  const gesamt = rangliste('gesamt');
-
   el.punkte.innerHTML = '';
-  el.punkte.appendChild(tabelle('Dieser Monat', monat, 'monat'));
-  el.punkte.appendChild(tabelle('Gesamt', gesamt, 'gesamt'));
+  el.punkte.appendChild(
+    tabelle('Uploads diesen Monat', rangliste('monat'), 'monat'));
+  el.punkte.appendChild(
+    tabelle('Uploads gesamt', rangliste('gesamt'), 'gesamt'));
+  el.punkte.appendChild(
+    tabelle('Dino – weiteste Strecke', rangliste('best'), 'best', ' m'));
 }
 
-function tabelle(titel, liste, feld) {
+function tabelle(titel, liste, feld, einheit) {
   const kasten = document.createElement('div');
   kasten.className = 'bestenliste';
 
@@ -1906,7 +2008,7 @@ function tabelle(titel, liste, feld) {
     zeile.innerHTML =
         '<td class="platz">' + platz + '</td>'
       + '<td class="wer">' + escape_(eintrag.name) + '</td>'
-      + '<td class="wert">' + eintrag[feld] + '</td>';
+      + '<td class="wert">' + eintrag[feld] + (einheit || '') + '</td>';
     t.appendChild(zeile);
   });
 
@@ -2037,8 +2139,14 @@ function spielBereitstellen() {
   ctx.font = '12px system-ui, sans-serif';
   ctx.textAlign = 'center';
   const best = bestwert();
-  ctx.fillText('Tippen zum Spielen' + (best ? ' · beste ' + best + ' m' : ''),
-    breite / 2, hoehe / 2);
+  const marken = meineTokens();
+  ctx.fillText(
+    marken > 0
+      ? 'Tippen zum Spielen' + (best ? ' · beste ' + best + ' m' : '')
+      : 'Keine Marken – lade etwas hoch',
+    breite / 2, hoehe / 2
+  );
+  spielKopfAktualisieren();
 
   leinwand.onpointerdown = function () {
     leinwand.onpointerdown = null;
@@ -2049,11 +2157,26 @@ function spielBereitstellen() {
 function spielStarten() {
   if (spielLauf) return;
 
+  // Eine Runde kostet eine Marke
+  const spieler = meinName();
+  if (!spieler) {
+    spielHinweis('Oben bei „Ich bin" auswählen, wer du bist.');
+    return;
+  }
+  if (tokenStand(spieler) <= 0) {
+    spielHinweis('Keine Marken übrig. Jeder Upload bringt eine neue.');
+    return;
+  }
+  punkteEintrag(spieler).gespielt++;
+  punkteSpeichern(spieler);
+  spielKopfAktualisieren();
+
   el.spiel.hidden = false;
   const leinwand = el.spielFeld;
   const ctx = leinwand.getContext('2d');
 
   const zustand = {
+    spieler: spieler,
     y: 0, vy: 0,
     tempo: SPIEL.START_TEMPO,
     strecke: 0,
@@ -2106,7 +2229,17 @@ function spielStarten() {
     if (zustand.vy > 0) zustand.vy *= SPIEL.KURZ;
   }
 
+  // Auch eine neue Runde kostet eine Marke
   function neustart() {
+    if (tokenStand(zustand.spieler) <= 0) {
+      spielHinweis('Keine Marken übrig. Jeder Upload bringt eine neue.');
+      spielBeenden();
+      return;
+    }
+    punkteEintrag(zustand.spieler).gespielt++;
+    punkteSpeichern(zustand.spieler);
+    spielKopfAktualisieren();
+
     zustand.y = 0; zustand.vy = 0;
     zustand.tempo = SPIEL.START_TEMPO;
     zustand.strecke = 0;
@@ -2244,7 +2377,7 @@ function rechnen(z, dt) {
     if (z.y < h.unten + h.h - 4 && z.y + SPIEL.FIGUR_H > h.unten + 4) {
       z.vorbei = true;
       z.endeZeit = Date.now();
-      bestwertMerken(Math.floor(z.strecke / 10));
+      bestwertMerken(z.spieler, Math.floor(z.strecke / 10));
       break;
     }
   }
@@ -2268,16 +2401,42 @@ function dinoFeld(z) {
   return DINO.LAUF[i];
 }
 
-function bestwert() {
-  try { return Number(localStorage.getItem('videotagebuch.bestwert')) || 0; }
-  catch (e) { return 0; }
+/**
+ * Bestwerte liegen in derselben Datei wie die Punkte – also in
+ * Drive, nicht nur lokal. Sonst ließen sie sich nicht vergleichen
+ * und wären beim Gerätewechsel weg.
+ */
+function bestwert(name) {
+  const e = punkte[name || meinName()];
+  return (e && e.bestwert) || 0;
 }
-function bestwertMerken(meter) {
-  try {
-    if (meter > bestwert()) {
-      localStorage.setItem('videotagebuch.bestwert', String(meter));
-    }
-  } catch (e) {}
+
+function bestwertMerken(name, meter) {
+  if (!name) return;
+  const e = punkteEintrag(name);
+  if (meter > (e.bestwert || 0)) {
+    e.bestwert = meter;
+    punkteSpeichern(name);
+  }
+}
+
+/** Kurze Meldung im Kopf des Spielfelds. */
+function spielHinweis(text) {
+  const kopf = el.spiel.querySelector('.spielkopf span');
+  if (!kopf) return;
+  const vorher = kopf.textContent;
+  kopf.textContent = text;
+  setTimeout(function () { spielKopfAktualisieren(vorher); }, 3000);
+}
+
+function spielKopfAktualisieren(rueckfall) {
+  const kopf = el.spiel.querySelector('.spielkopf span');
+  if (!kopf) return;
+  const name = meinName();
+  kopf.textContent = name
+    ? 'Springen: tippen oder Leertaste · ' + Math.max(0, tokenStand(name))
+      + (tokenStand(name) === 1 ? ' Marke' : ' Marken')
+    : (rueckfall || 'Springen: tippen oder Leertaste.');
 }
 
 function zeichnen(ctx, z) {
