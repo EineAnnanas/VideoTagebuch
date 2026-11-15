@@ -501,7 +501,7 @@
   <button id="waehlen" class="wichtig">Videos auswählen</button>
   <input type="file" id="datei" accept="video/*,image/*" multiple hidden>
   <span id="hochladen-status"></span>
-  <button id="spielknopf" class="leise" hidden>Spielen</button>
+  <button id="spielknopf" class="leise">Spielen</button>
   <div id="balken" hidden><div></div></div>
 </div>
 
@@ -2715,8 +2715,10 @@ document.getElementById('absenden').onclick = async function () {
   el.fehler.hidden = true;
   el.waehlen.disabled = true;
   el.balken.hidden = false;
-  el.spielKnopf.hidden = false;      // Wartezeit überbrücken
   setzeBalken(0);
+
+  // Beim Hochladen von selbst aufgehen – dafür ist es da
+  if (el.spiel.hidden) spielStarten();
 
   const fuerTag = plusTage(new Date(), -Number(el.fuer.value || 0));
 
