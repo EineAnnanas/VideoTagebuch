@@ -421,6 +421,12 @@
   .bestenliste tr.ich .wer { font-weight: 600; }
   .bestenliste tr.ich .platz { color: var(--grau); }
   .bestenliste tr:first-child .wert { font-size: 1.15rem; }
+  .bestenliste tr.herkunft td {
+    font-size: .72rem;
+    color: var(--grau);
+    padding: 0 0 .5rem;
+    line-height: 1.45;
+  }
 
   /* ---- Overlay ---- */
   #overlay {
@@ -1851,7 +1857,19 @@ function tokenStand(name) {
 
 function meineTokens() { return tokenStand(meinName()); }
 
-/** Zählt die vorhandenen Dateien pro Tag, mit Wochengrenze. */
+/** War diese Person an dem Tag überhaupt dran? */
+function istDran(name, tagSchluessel) {
+  const dran = werIstDran(new Date(tagSchluessel + 'T12:00:00'));
+  return !!dran && !!name && dran.toLowerCase() === name.toLowerCase();
+}
+
+/**
+ * Zählt die vorhandenen Dateien pro Tag, mit Wochengrenze.
+ *
+ * Nur die eigenen Tage zählen. Wer außer der Reihe etwas hochlädt,
+ * bekommt dafür keine Punkte – sonst wäre die Rotation sinnlos und
+ * es gewänne, wer am meisten dazwischenfunkt.
+ */
 function ausDriveZaehlen(name) {
   const ordner = ordnerFuer(name);
   if (!ordner) return {};
@@ -1859,6 +1877,7 @@ function ausDriveZaehlen(name) {
   const roh = {};
   dateien.forEach(function (d) {
     if (d.ordner !== ordner.name) return;
+    if (!istDran(name, d.tagSchluessel)) return;
     roh[d.tagSchluessel] = (roh[d.tagSchluessel] || 0) + 1;
   });
 
@@ -1880,7 +1899,10 @@ function ausDriveZaehlen(name) {
 async function punktVermerken(name, tag, anzahl) {
   if (!name || !tag || !anzahl) return 0;
 
-  const eintrag = punkte[name] || (punkte[name] = { id: null, tage: {} });
+  // Nur die eigenen Tage zählen
+  if (!istDran(name, tag)) return 0;
+
+  const eintrag = punkteEintrag(name);
   const schon = wochenSumme(eintrag.tage, tag);
   const rest = Math.max(0, CONFIG.PUNKTE_PRO_WOCHE - schon);
   const zusatz = Math.min(anzahl, rest);
@@ -1986,6 +2008,32 @@ function zeichnePunkte() {
     tabelle('Dino – weiteste Strecke', rangliste('best'), 'best', ' m'));
 }
 
+/** Listet auf, an welchem Tag wie viele Punkte zusammenkamen. */
+function herkunftText(name, feld) {
+  const tage = (punkte[name] || {}).tage || {};
+  const jetzt = new Date();
+  const monatsPraefix = jetzt.getFullYear() + '-'
+    + String(jetzt.getMonth() + 1).padStart(2, '0');
+
+  const relevant = Object.keys(tage)
+    .filter(function (t) {
+      return feld === 'gesamt' || t.indexOf(monatsPraefix) === 0;
+    })
+    .sort()
+    .reverse();
+
+  if (!relevant.length) return 'noch nichts hochgeladen';
+
+  const teile = relevant.map(function (t) {
+    const d = t.split('-');
+    return d[2] + '.' + d[1] + '.: ' + tage[t];
+  });
+
+  const summe = relevant.reduce(function (s, t) { return s + tage[t]; }, 0);
+  return teile.join(' · ') + '  —  ' + relevant.length
+    + (relevant.length === 1 ? ' Tag, ' : ' Tage, ') + summe + ' Dateien';
+}
+
 function tabelle(titel, liste, feld, einheit) {
   const kasten = document.createElement('div');
   kasten.className = 'bestenliste';
@@ -2010,6 +2058,21 @@ function tabelle(titel, liste, feld, einheit) {
       + '<td class="wer">' + escape_(eintrag.name) + '</td>'
       + '<td class="wert">' + eintrag[feld] + (einheit || '') + '</td>';
     t.appendChild(zeile);
+
+    // Antippen zeigt, woher die Zahl kommt. Eine Punktzahl, die man
+    // nicht nachrechnen kann, wirkt immer falsch – auch wenn sie
+    // stimmt.
+    if (feld !== 'best') {
+      const detail = document.createElement('tr');
+      detail.className = 'herkunft';
+      detail.hidden = true;
+      detail.innerHTML = '<td></td><td colspan="2">'
+        + herkunftText(eintrag.name, feld) + '</td>';
+      t.appendChild(detail);
+
+      zeile.style.cursor = 'pointer';
+      zeile.onclick = function () { detail.hidden = !detail.hidden; };
+    }
   });
 
   kasten.appendChild(t);
@@ -3195,13 +3258,17 @@ document.getElementById('absenden').onclick = async function () {
     await Promise.all(
       Array.from({ length: Math.min(PARALLEL, entwurf.length) }, arbeiter)
     );
-    // Ein Punkt pro Datei, gedeckelt auf fünf pro Woche
+    // Ein Punkt pro Datei am eigenen Tag, gedeckelt auf fünf pro Woche
+    const tagSchluessel = schluessel(fuerTag);
     const bekommen = await punktVermerken(
-      meinName(), schluessel(fuerTag), fertige.length
+      meinName(), tagSchluessel, fertige.length
     );
+
     el.hlStatus.textContent = bekommen
       ? 'fertig · ' + bekommen + (bekommen === 1 ? ' Punkt' : ' Punkte')
-      : 'fertig · Wochengrenze erreicht';
+      : (istDran(meinName(), tagSchluessel)
+          ? 'fertig · Wochengrenze erreicht'
+          : 'fertig · keine Punkte, du warst nicht dran');
 
   } catch (fehler) {
     el.hlStatus.textContent = fertige.length
