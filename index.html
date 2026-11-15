@@ -2040,7 +2040,14 @@ const SPIEL = {
   SPRUNG: 560,
   KURZ: 0.35,         // Restschwung beim Loslassen
   START_TEMPO: 230,
-  MAX_TEMPO: 560,
+  MAX_TEMPO: 900,
+  BESCHLEUNIGUNG: 13,     // Pixel pro Sekunde², zieht dauerhaft an
+
+  // Mindestabstand zwischen Hindernissen, gemessen in Zeit statt in
+  // Pixeln. Ein voller Sprung dauert gut 0,6 Sekunden – käme das
+  // nächste Hindernis früher, wäre es nicht mehr schwer, sondern
+  // unmöglich. Dieser Boden gilt unabhängig vom Tempo.
+  MIN_ABSTAND_ZEIT: 0.78,
 
   FIGUR_X: 34,        // feste Position auf der Bahn
   FIGUR_B: 30,        // Kollisionskasten, enger als das Bild –
@@ -2328,41 +2335,30 @@ function rechnen(z, dt) {
   z.y += z.vy * dt;
   if (z.y <= 0) { z.y = 0; z.vy = 0; z.haelt = false; }
 
-  // Tempo zieht langsam an
-  z.tempo = Math.min(SPIEL.MAX_TEMPO, z.tempo + 9 * dt);
+  // Tempo zieht dauerhaft an
+  z.tempo = Math.min(SPIEL.MAX_TEMPO, z.tempo + SPIEL.BESCHLEUNIGUNG * dt);
   z.strecke += z.tempo * dt;
 
   // Nachschub
   z.naechstes -= z.tempo * dt;
   if (z.naechstes <= 0) {
-    // Fliegende erst, wenn man das Springen raushat
-    const fliegend = z.strecke > 900 && Math.random() < 0.35;
+    const neu = naechstesHindernis(z);
+    z.hindernisse.push(neu);
 
-    if (fliegend) {
-      // Hängt in Sprunghöhe: unten durchlaufen ist richtig,
-      // springen wäre der Fehler.
-      z.hindernisse.push({
-        x: z.breite + 20, b: 18, h: 14,
-        unten: 48 + Math.random() * 22,
-        flug: true
-      });
-    } else {
-      const schmal = Math.random() < 0.3;
-      z.hindernisse.push({
-        x: z.breite + 20,
-        b: schmal ? 12 : 16,
-        h: schmal ? 42 : 26,
-        unten: 0
-      });
-    }
-    // Abstand so wählen, dass es schaffbar bleibt. Um fliegende
-    // herum extra Luft: Ein Pfosten direkt davor oder dahinter
-    // zwingt zum Springen, genau wenn man am Boden bleiben müsste –
-    // das wäre nicht mehr lösbar, sondern nur unfair.
+    // Die Abstände schrumpfen mit der Strecke – aber nie unter die
+    // Zeit, die ein Sprung braucht. Nach etwa 700 Metern ist das
+    // Engste erreicht, ab da macht nur noch das Tempo den Druck.
+    const enger = Math.max(0.55, 1 - (z.strecke / 10) / 700);
+    let abstand = (300 + Math.random() * 200) * enger + z.tempo * 0.18;
+    abstand = Math.max(abstand, z.tempo * SPIEL.MIN_ABSTAND_ZEIT);
+
+    // Um fliegende herum extra Luft: Ein Pfosten direkt davor oder
+    // dahinter zwingt zum Springen, genau wenn man am Boden bleiben
+    // müsste – das wäre nicht mehr lösbar, sondern nur unfair.
     const vorheriges = z.hindernisse[z.hindernisse.length - 2];
-    const umFlug = fliegend || (vorheriges && vorheriges.flug);
-    z.naechstes = 260 + Math.random() * 220 + z.tempo * 0.25
-                + (umFlug ? 220 : 0);
+    if (neu.flug || (vorheriges && vorheriges.flug)) abstand += 240;
+
+    z.naechstes = abstand;
   }
 
   z.hindernisse.forEach(function (h) { h.x -= z.tempo * dt; });
@@ -2406,6 +2402,42 @@ function dinoFeld(z) {
  * Drive, nicht nur lokal. Sonst ließen sie sich nicht vergleichen
  * und wären beim Gerätewechsel weg.
  */
+/**
+ * Was als Nächstes kommt, hängt von der gelaufenen Strecke ab.
+ * Neue Arten kommen erst dazu, wenn die vorherige sitzt – sonst
+ * stirbt man an etwas, das man noch nie gesehen hat.
+ *
+ *   ab   0 m  einzelne Pfosten
+ *   ab 150 m  fliegende Hindernisse (unten durchlaufen)
+ *   ab 400 m  Doppelpfosten (nur mit vollem Sprung)
+ *   ab 800 m  Dreifachpfosten
+ *
+ * Gerechnet wird in angezeigten Metern, also Strecke durch zehn.
+ */
+function naechstesHindernis(z) {
+  const x = z.breite + 20;
+  const meter = z.strecke / 10;
+  const w = Math.random();
+
+  if (meter > 150 && w < 0.3) {
+    return { x: x, b: 18, h: 14, unten: 48 + Math.random() * 22, flug: true };
+  }
+  if (meter > 800 && w < 0.45) {
+    return { x: x, b: 54, h: 26, unten: 0 };      // drei nebeneinander
+  }
+  if (meter > 400 && w < 0.55) {
+    return { x: x, b: 36, h: 26, unten: 0 };      // zwei nebeneinander
+  }
+
+  const schmal = Math.random() < 0.3;
+  return {
+    x: x,
+    b: schmal ? 12 : 16,
+    h: schmal ? 42 : 26,
+    unten: 0
+  };
+}
+
 function bestwert(name) {
   const e = punkte[name || meinName()];
   return (e && e.bestwert) || 0;
