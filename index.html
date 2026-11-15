@@ -166,6 +166,28 @@
     cursor: pointer;
   }
 
+  /* Am Handy über den ganzen Bildschirm. Die Zeichenfläche bleibt
+     dabei flach – getippt werden darf aber überall, auch weit
+     darüber und darunter. */
+  #spiel.vollbild {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    touch-action: manipulation;
+  }
+  #spiel.vollbild .spielkopf {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    border-bottom: 0;
+  }
+  #spiel.vollbild #spielfeld { height: 230px; }
+
   /* ---- Zusammenstellen vor dem Hochladen ---- */
   #composer {
     border: 1px solid var(--text);
@@ -1895,24 +1917,85 @@ function tabelle(titel, liste, feld) {
 
 // ============ SPIEL ============
 //
-// Ein Sprungspiel für die Wartezeit beim Hochladen. Eigene Figur,
-// eigene Hindernisse – kein Nachbau eines fremden Spiels.
+// Ein Sprungspiel für die Wartezeit beim Hochladen.
 //
-// Die Leben kommen aus den gesammelten Punkten. Verbraucht werden
-// sie nicht: Sonst müsste man sich zwischen Bestenliste und Spielen
-// entscheiden, und die Bestenliste wäre nichts mehr wert. Wer mehr
-// hochlädt, hält im Spiel länger durch – das reicht als Anreiz.
+// Ein Leben: Ein Treffer beendet die Runde. Pfosten werden
+// übersprungen, fliegende Hindernisse unterlaufen.
+//
+// Die Dino-Grafiken stammen aus dem Paket "Dino Characters" von
+// Arks (@ArksDigital, arks.itch.io). Nutzung erlaubt, Bedingung ist
+// die Namensnennung – sie steht im README.
 
 const SPIEL = {
   BODEN: 24,          // Abstand der Standlinie vom unteren Rand
-  SCHWERKRAFT: 2100,  // Pixel pro Sekunde²
-  SPRUNG: 620,        // voller Sprung, reicht etwa 90 Pixel hoch
-  KURZ: 0.38,         // beim Loslassen bleibt so viel Schwung übrig
+  // Zwei Schwerkräfte statt einer. Solange gedrückt wird, zieht es
+  // schwächer nach unten – beim Loslassen stärker. Dadurch wächst
+  // der Sprung mit der Tippdauer, ohne dass der Schwung abrupt
+  // abgeschnitten wird. Genau das hat sich vorher eckig angefühlt.
+  SCHWERKRAFT_HALTEN: 1900,
+  SCHWERKRAFT_FALL: 2700,
+  SCHEITEL: 0.55,     // kurz vor dem Umkehrpunkt noch weicher
+  SPRUNG: 560,
+  KURZ: 0.35,         // Restschwung beim Loslassen
   START_TEMPO: 230,
   MAX_TEMPO: 560,
-  FIGUR: 26,
-  FIGUR_X: 34
+
+  FIGUR_X: 34,        // feste Position auf der Bahn
+  FIGUR_B: 30,        // Kollisionskasten, enger als das Bild –
+  FIGUR_H: 32,        // der Schwanz soll nicht mitzählen
+  BILD: 48,           // Darstellungsgröße (24 px Vorlage, doppelt)
+  BILD_VERSATZ: -7    // damit der Körper über dem Kasten sitzt
 };
+
+// Felder im Sprite-Sheet: 24 Stück à 24 px
+const DINO = {
+  RUHE:   [0, 1, 2, 3],
+  LAUF:   [4, 5, 6, 7, 8, 9],
+  AUF:    5,     // Beine angezogen – passt zum Aufstieg
+  AB:     8,     // Bein nach unten gestreckt – passt zum Fallen
+  STAUB: 15,
+  TOT:   16
+};
+
+// Jeder bekommt seinen eigenen Dino, abgeleitet vom Namen.
+const DINO_FARBEN = ['doux', 'mort', 'tard', 'vita'];
+
+const dinoBild = new Image();
+let dinoGeladen = false;
+dinoBild.onload = function () { dinoGeladen = true; };
+dinoBild.src = 'dino-' + dinoFarbe() + '.png';
+
+function dinoFarbe() {
+  let name = '';
+  try { name = meinName() || ''; } catch (e) {}
+  let summe = 0;
+  for (let i = 0; i < name.length; i++) summe += name.charCodeAt(i);
+  return DINO_FARBEN[summe % DINO_FARBEN.length];
+}
+
+/** Beim Wechsel der Person den passenden Dino nachladen. */
+function dinoBildAktualisieren() {
+  const neu = 'dino-' + dinoFarbe() + '.png';
+  if (dinoBild.getAttribute('src') === neu) return;
+  dinoGeladen = false;
+  dinoBild.src = neu;
+}
+
+/** Zeichnet ein Feld des Sheets so, dass die Füße auf der Linie stehen. */
+function zeichneDino(ctx, x, fussY, feld) {
+  if (!dinoGeladen) {
+    // Solange das Bild lädt: schlichter Kasten, damit nichts springt
+    ctx.fillStyle = '#2c2b26';
+    ctx.fillRect(x, fussY - SPIEL.FIGUR_H, SPIEL.FIGUR_B, SPIEL.FIGUR_H);
+    return;
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(
+    dinoBild,
+    feld * 24, 0, 24, 24,
+    x + SPIEL.BILD_VERSATZ, fussY - SPIEL.BILD, SPIEL.BILD, SPIEL.BILD
+  );
+}
 
 let spielLauf = null;
 
@@ -1948,16 +2031,7 @@ function spielBereitstellen() {
   ctx.stroke();
 
   // Figur im Stand
-  const fx = 34, fy = bodenY - SPIEL.FIGUR;
-  ctx.fillStyle = '#2c2b26';
-  ctx.beginPath();
-  ctx.roundRect(fx, fy, SPIEL.FIGUR, SPIEL.FIGUR - 4, 4);
-  ctx.fill();
-  ctx.fillRect(fx + 5, fy - 4, 9, 4);
-  ctx.fillStyle = '#faf9f5';
-  ctx.beginPath();
-  ctx.arc(fx + SPIEL.FIGUR / 2, fy + (SPIEL.FIGUR - 4) / 2, 5, 0, Math.PI * 2);
-  ctx.fill();
+  zeichneDino(ctx, SPIEL.FIGUR_X, bodenY, DINO.RUHE[0]);
 
   ctx.fillStyle = '#8a877c';
   ctx.font = '12px system-ui, sans-serif';
@@ -2050,10 +2124,24 @@ function spielStarten() {
     if (e.code === 'Space' || e.code === 'ArrowUp') loslassen();
   }
 
-  leinwand.addEventListener('pointerdown', los);
-  leinwand.addEventListener('pointerup', loslassen);
-  leinwand.addEventListener('pointercancel', loslassen);
-  leinwand.addEventListener('pointerleave', loslassen);
+  // Am Handy auf den ganzen Bildschirm gehen. In einen 170 Pixel
+  // hohen Streifen zu treffen, während man spielt, ist Quälerei.
+  if (istSchmal()) el.spiel.classList.add('vollbild');
+
+  // Auf die ganze Fläche hören, nicht nur auf die Zeichenfläche –
+  // sonst muss man im Vollbild weiter das kleine Feld treffen.
+  function aufFlaeche(fn) {
+    return function (e) {
+      if (e.target.closest && e.target.closest('button')) return;
+      fn(e);
+    };
+  }
+  const losAufFlaeche = aufFlaeche(los);
+  const loslassenAufFlaeche = aufFlaeche(loslassen);
+
+  el.spiel.addEventListener('pointerdown', losAufFlaeche);
+  el.spiel.addEventListener('pointerup', loslassenAufFlaeche);
+  el.spiel.addEventListener('pointercancel', loslassenAufFlaeche);
   document.addEventListener('keydown', taste);
   document.addEventListener('keyup', tasteAuf);
 
@@ -2078,10 +2166,10 @@ function spielStarten() {
     window.removeEventListener('resize', groesseAnpassen);
     document.removeEventListener('keydown', taste);
     document.removeEventListener('keyup', tasteAuf);
-    leinwand.removeEventListener('pointerdown', los);
-    leinwand.removeEventListener('pointerup', loslassen);
-    leinwand.removeEventListener('pointercancel', loslassen);
-    leinwand.removeEventListener('pointerleave', loslassen);
+    el.spiel.removeEventListener('pointerdown', losAufFlaeche);
+    el.spiel.removeEventListener('pointerup', loslassenAufFlaeche);
+    el.spiel.removeEventListener('pointercancel', loslassenAufFlaeche);
+    el.spiel.classList.remove('vollbild');
     el.spiel._beenden = null;
     spielBereitstellen();      // zurück in den Ruhezustand
   };
@@ -2094,10 +2182,18 @@ function spielBeenden() {
 }
 
 function rechnen(z, dt) {
-  // Sprung
-  z.vy -= SPIEL.SCHWERKRAFT * dt;
+  // Sprung mit veränderlicher Schwerkraft
+  let g = (z.haelt && z.vy > 0)
+    ? SPIEL.SCHWERKRAFT_HALTEN
+    : SPIEL.SCHWERKRAFT_FALL;
+
+  // Nahe am Umkehrpunkt kurz schwächer – das nimmt dem Sprung die
+  // Spitze und lässt ihn runder wirken.
+  if (Math.abs(z.vy) < 120) g *= SPIEL.SCHEITEL;
+
+  z.vy -= g * dt;
   z.y += z.vy * dt;
-  if (z.y <= 0) { z.y = 0; z.vy = 0; }
+  if (z.y <= 0) { z.y = 0; z.vy = 0; z.haelt = false; }
 
   // Tempo zieht langsam an
   z.tempo = Math.min(SPIEL.MAX_TEMPO, z.tempo + 9 * dt);
@@ -2114,7 +2210,7 @@ function rechnen(z, dt) {
       // springen wäre der Fehler.
       z.hindernisse.push({
         x: z.breite + 20, b: 18, h: 14,
-        unten: 44 + Math.random() * 22,
+        unten: 48 + Math.random() * 22,
         flug: true
       });
     } else {
@@ -2140,22 +2236,36 @@ function rechnen(z, dt) {
   z.hindernisse = z.hindernisse.filter(function (h) { return h.x + h.b > -10; });
 
   // Zusammenstoß – ein Treffer genügt
-  const fx = SPIEL.FIGUR_X, fb = SPIEL.FIGUR;
+  const fx = SPIEL.FIGUR_X;
   for (const h of z.hindernisse) {
-    const ueberlapptX = fx + fb > h.x + 3 && fx < h.x + h.b - 3;
+    const ueberlapptX = fx + SPIEL.FIGUR_B > h.x + 3 && fx < h.x + h.b - 3;
     if (!ueberlapptX) continue;
 
-    const figurUnten = z.y;
-    const figurOben = z.y + fb;
-    const hUnten = h.unten;
-    const hOben = h.unten + h.h;
-
-    if (figurUnten < hOben - 4 && figurOben > hUnten + 4) {
+    if (z.y < h.unten + h.h - 4 && z.y + SPIEL.FIGUR_H > h.unten + 4) {
       z.vorbei = true;
+      z.endeZeit = Date.now();
       bestwertMerken(Math.floor(z.strecke / 10));
       break;
     }
   }
+}
+
+/**
+ * Welches Feld des Sheets gerade gezeigt wird.
+ *
+ * Eine fertige Sprunganimation gibt es in der Vorlage nicht – sie
+ * wird aus dem Laufzyklus zusammengesetzt: beim Steigen das Bild
+ * mit angezogenen Beinen, beim Fallen das mit gestrecktem Bein.
+ */
+function dinoFeld(z) {
+  if (z.vorbei) {
+    // Kurz die Staubwolke, dann liegen bleiben
+    return (Date.now() - z.endeZeit < 260) ? DINO.STAUB : DINO.TOT;
+  }
+  if (z.y > 0) return z.vy > 0 ? DINO.AUF : DINO.AB;
+
+  const i = Math.floor(z.strecke / 14) % DINO.LAUF.length;
+  return DINO.LAUF[i];
 }
 
 function bestwert() {
@@ -2199,21 +2309,8 @@ function zeichnen(ctx, z) {
     );
   });
 
-  // Figur: eine kleine Kamera
-  const fx = SPIEL.FIGUR_X;
-  const fy = bodenY - SPIEL.FIGUR - z.y;
-
-  ctx.fillStyle = '#2c2b26';
-  ctx.beginPath();
-  ctx.roundRect(fx, fy, SPIEL.FIGUR, SPIEL.FIGUR - 4, 4);
-  ctx.fill();
-  // Sucher oben
-  ctx.fillRect(fx + 5, fy - 4, 9, 4);
-  // Linse
-  ctx.fillStyle = '#faf9f5';
-  ctx.beginPath();
-  ctx.arc(fx + SPIEL.FIGUR / 2, fy + (SPIEL.FIGUR - 4) / 2, 5, 0, Math.PI * 2);
-  ctx.fill();
+  // Figur
+  zeichneDino(ctx, SPIEL.FIGUR_X, bodenY - z.y, dinoFeld(z));
 
   // Strecke und Bestwert
   ctx.fillStyle = '#8a877c';
@@ -3256,10 +3353,15 @@ function fuellePersonen() {
   });
 
   if (vorher) el.person.value = vorher;
+  dinoBildAktualisieren();
 }
 
 // Person oder Tag zu wechseln ändert das Tageslimit – neu prüfen.
-el.person.onchange = function () { merkePerson(); zeichneEntwurf(); };
+el.person.onchange = function () {
+  merkePerson();
+  zeichneEntwurf();
+  dinoBildAktualisieren();
+};
 el.fuer.onchange = function () { zeichneEntwurf(); };
 
 function merkePerson() {
