@@ -140,6 +140,32 @@
   }
   #balken > div { height: 100%; width: 0; background: var(--text); transition: width .2s; }
 
+  /* ---- Spiel ---- */
+  #spiel {
+    border: 1px solid var(--rand);
+    border-radius: 6px;
+    background: var(--papier);
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+  }
+  .spielkopf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .4rem .5rem .4rem .7rem;
+    font-size: .75rem;
+    color: var(--grau);
+    border-bottom: 1px solid var(--rand);
+  }
+  #spielfeld {
+    display: block;
+    width: 100%;
+    height: 170px;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+
   /* ---- Zusammenstellen vor dem Hochladen ---- */
   #composer {
     border: 1px solid var(--text);
@@ -475,8 +501,17 @@
   <button id="waehlen" class="wichtig">Videos auswählen</button>
   <input type="file" id="datei" accept="video/*,image/*" multiple hidden>
   <span id="hochladen-status"></span>
+  <button id="spielknopf" class="leise" hidden>Spielen</button>
   <div id="balken" hidden><div></div></div>
 </div>
+
+<section id="spiel" hidden>
+  <div class="spielkopf">
+    <span>Springen: tippen oder Leertaste. Leben = deine Punkte.</span>
+    <button id="spielzu" class="leise symbol" title="Schließen">&times;</button>
+  </div>
+  <canvas id="spielfeld"></canvas>
+</section>
 
 <section id="composer" hidden>
   <div>
@@ -663,6 +698,9 @@ const el = {
   datei:     document.getElementById('datei'),
   hlStatus:  document.getElementById('hochladen-status'),
   balken:    document.getElementById('balken'),
+  spiel:     document.getElementById('spiel'),
+  spielFeld: document.getElementById('spielfeld'),
+  spielKnopf:document.getElementById('spielknopf'),
   composer:  document.getElementById('composer'),
   cTitel:    document.getElementById('composer-titel'),
   cListe:    document.getElementById('composer-liste'),
@@ -2677,6 +2715,7 @@ document.getElementById('absenden').onclick = async function () {
   el.fehler.hidden = true;
   el.waehlen.disabled = true;
   el.balken.hidden = false;
+  el.spielKnopf.hidden = false;      // Wartezeit überbrücken
   setzeBalken(0);
 
   const fuerTag = plusTage(new Date(), -Number(el.fuer.value || 0));
@@ -2757,6 +2796,11 @@ document.getElementById('absenden').onclick = async function () {
 };
 
 function setzeBalken(p) { el.balken.firstElementChild.style.width = p + '%'; }
+
+el.spielKnopf.onclick = function () {
+  if (el.spiel.hidden) spielStarten(); else spielBeenden();
+};
+document.getElementById('spielzu').onclick = spielBeenden;
 
 function uhrzeitMarke(lfdNr) {
   const d = new Date();
