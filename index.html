@@ -507,7 +507,7 @@
 
 <section id="spiel" hidden>
   <div class="spielkopf">
-    <span>Springen: tippen oder Leertaste. Leben = deine Punkte.</span>
+    <span>Springen: tippen oder Leertaste. Kurz tippen springt flacher.</span>
     <button id="spielzu" class="leise symbol" title="Schließen">&times;</button>
   </div>
   <canvas id="spielfeld"></canvas>
@@ -1906,10 +1906,12 @@ function tabelle(titel, liste, feld) {
 const SPIEL = {
   BODEN: 24,          // Abstand der Standlinie vom unteren Rand
   SCHWERKRAFT: 2100,  // Pixel pro Sekunde²
-  SPRUNG: 620,
+  SPRUNG: 620,        // voller Sprung, reicht etwa 90 Pixel hoch
+  KURZ: 0.38,         // beim Loslassen bleibt so viel Schwung übrig
   START_TEMPO: 230,
   MAX_TEMPO: 560,
-  FIGUR: 26
+  FIGUR: 26,
+  FIGUR_X: 34
 };
 
 let spielLauf = null;
@@ -1960,8 +1962,8 @@ function spielBereitstellen() {
   ctx.fillStyle = '#8a877c';
   ctx.font = '12px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Tippen zum Spielen · ' + Math.max(1, meinePunkte())
-    + (Math.max(1, meinePunkte()) === 1 ? ' Leben' : ' Leben'),
+  const best = bestwert();
+  ctx.fillText('Tippen zum Spielen' + (best ? ' · beste ' + best + ' m' : ''),
     breite / 2, hoehe / 2);
 
   leinwand.onpointerdown = function () {
@@ -1977,36 +1979,57 @@ function spielStarten() {
   const leinwand = el.spielFeld;
   const ctx = leinwand.getContext('2d');
 
-  const lebenStart = Math.max(1, meinePunkte());
-
   const zustand = {
     y: 0, vy: 0,
     tempo: SPIEL.START_TEMPO,
     strecke: 0,
     hindernisse: [],
     naechstes: 420,
-    leben: lebenStart,
-    unverwundbar: 0,
+    haelt: false,
     vorbei: false,
-    laeuft: true
+    laeuft: true,
+    breite: 320,
+    hoehe: 170
   };
 
   function groesseAnpassen() {
     const dpr = window.devicePixelRatio || 1;
     const breite = leinwand.clientWidth || 320;
     const hoehe = leinwand.clientHeight || 170;
-    leinwand.width = Math.round(breite * dpr);
-    leinwand.height = Math.round(hoehe * dpr);
+    // Nur neu setzen, wenn es sich wirklich geändert hat – sonst
+    // wird bei jedem Aufruf die Zeichenfläche geleert.
+    if (leinwand.width !== Math.round(breite * dpr)
+     || leinwand.height !== Math.round(hoehe * dpr)) {
+      leinwand.width = Math.round(breite * dpr);
+      leinwand.height = Math.round(hoehe * dpr);
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     zustand.breite = breite;
     zustand.hoehe = hoehe;
   }
   groesseAnpassen();
+
+  // Beobachtet die tatsächliche Größe des Elements. Das Umschalten
+  // auf Handybreite löst kein resize am Fenster aus – nur so merkt
+  // die Zeichenfläche, dass sie schmaler geworden ist.
+  const beobachter = ('ResizeObserver' in window)
+    ? new ResizeObserver(groesseAnpassen) : null;
+  if (beobachter) beobachter.observe(leinwand);
   window.addEventListener('resize', groesseAnpassen);
 
-  function springen() {
+  function los() {
     if (zustand.vorbei) { neustart(); return; }
-    if (zustand.y === 0) zustand.vy = SPIEL.SPRUNG;
+    if (zustand.y === 0) {
+      zustand.vy = SPIEL.SPRUNG;
+      zustand.haelt = true;
+    }
+  }
+
+  // Kurz tippen, kurz springen: Beim Loslassen wird der Schwung
+  // gekappt, solange es noch aufwärts geht.
+  function loslassen() {
+    zustand.haelt = false;
+    if (zustand.vy > 0) zustand.vy *= SPIEL.KURZ;
   }
 
   function neustart() {
@@ -2015,20 +2038,24 @@ function spielStarten() {
     zustand.strecke = 0;
     zustand.hindernisse = [];
     zustand.naechstes = 420;
-    zustand.leben = Math.max(1, meinePunkte());
-    zustand.unverwundbar = 0;
     zustand.vorbei = false;
   }
 
   function taste(e) {
-    if (e.code === 'Space' || e.code === 'ArrowUp') {
-      e.preventDefault();
-      springen();
-    }
+    if (e.code !== 'Space' && e.code !== 'ArrowUp') return;
+    e.preventDefault();
+    if (!e.repeat) los();
+  }
+  function tasteAuf(e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp') loslassen();
   }
 
-  leinwand.addEventListener('pointerdown', springen);
+  leinwand.addEventListener('pointerdown', los);
+  leinwand.addEventListener('pointerup', loslassen);
+  leinwand.addEventListener('pointercancel', loslassen);
+  leinwand.addEventListener('pointerleave', loslassen);
   document.addEventListener('keydown', taste);
+  document.addEventListener('keyup', tasteAuf);
 
   let vorher = performance.now();
 
@@ -2037,22 +2064,24 @@ function spielStarten() {
     const dt = Math.min((jetzt - vorher) / 1000, 0.05);
     vorher = jetzt;
 
-    if (!zustand.vorbei) {
-      rechnen(zustand, dt);
-    }
+    if (!zustand.vorbei) rechnen(zustand, dt);
     zeichnen(ctx, zustand);
     spielLauf = requestAnimationFrame(bild);
   }
   spielLauf = requestAnimationFrame(bild);
 
-  // Zum Aufräumen beim Schließen
   el.spiel._beenden = function () {
     zustand.laeuft = false;
     cancelAnimationFrame(spielLauf);
     spielLauf = null;
+    if (beobachter) beobachter.disconnect();
     window.removeEventListener('resize', groesseAnpassen);
     document.removeEventListener('keydown', taste);
-    leinwand.removeEventListener('pointerdown', springen);
+    document.removeEventListener('keyup', tasteAuf);
+    leinwand.removeEventListener('pointerdown', los);
+    leinwand.removeEventListener('pointerup', loslassen);
+    leinwand.removeEventListener('pointercancel', loslassen);
+    leinwand.removeEventListener('pointerleave', loslassen);
     el.spiel._beenden = null;
     spielBereitstellen();      // zurück in den Ruhezustand
   };
@@ -2073,38 +2102,72 @@ function rechnen(z, dt) {
   // Tempo zieht langsam an
   z.tempo = Math.min(SPIEL.MAX_TEMPO, z.tempo + 9 * dt);
   z.strecke += z.tempo * dt;
-  if (z.unverwundbar > 0) z.unverwundbar -= dt;
 
-  // Hindernisse
+  // Nachschub
   z.naechstes -= z.tempo * dt;
   if (z.naechstes <= 0) {
-    const hoch = Math.random() < 0.3;
-    z.hindernisse.push({
-      x: z.breite + 20,
-      b: hoch ? 12 : 16,
-      h: hoch ? 42 : 26
-    });
-    // Abstand so wählen, dass es immer schaffbar bleibt
-    z.naechstes = 260 + Math.random() * 220 + z.tempo * 0.25;
+    // Fliegende erst, wenn man das Springen raushat
+    const fliegend = z.strecke > 900 && Math.random() < 0.35;
+
+    if (fliegend) {
+      // Hängt in Sprunghöhe: unten durchlaufen ist richtig,
+      // springen wäre der Fehler.
+      z.hindernisse.push({
+        x: z.breite + 20, b: 18, h: 14,
+        unten: 44 + Math.random() * 22,
+        flug: true
+      });
+    } else {
+      const schmal = Math.random() < 0.3;
+      z.hindernisse.push({
+        x: z.breite + 20,
+        b: schmal ? 12 : 16,
+        h: schmal ? 42 : 26,
+        unten: 0
+      });
+    }
+    // Abstand so wählen, dass es schaffbar bleibt. Um fliegende
+    // herum extra Luft: Ein Pfosten direkt davor oder dahinter
+    // zwingt zum Springen, genau wenn man am Boden bleiben müsste –
+    // das wäre nicht mehr lösbar, sondern nur unfair.
+    const vorheriges = z.hindernisse[z.hindernisse.length - 2];
+    const umFlug = fliegend || (vorheriges && vorheriges.flug);
+    z.naechstes = 260 + Math.random() * 220 + z.tempo * 0.25
+                + (umFlug ? 220 : 0);
   }
 
   z.hindernisse.forEach(function (h) { h.x -= z.tempo * dt; });
   z.hindernisse = z.hindernisse.filter(function (h) { return h.x + h.b > -10; });
 
-  // Zusammenstoß
-  const fx = 34, fb = SPIEL.FIGUR;
-  z.hindernisse.forEach(function (h) {
-    if (h.getroffen) return;
+  // Zusammenstoß – ein Treffer genügt
+  const fx = SPIEL.FIGUR_X, fb = SPIEL.FIGUR;
+  for (const h of z.hindernisse) {
     const ueberlapptX = fx + fb > h.x + 3 && fx < h.x + h.b - 3;
-    const ueberlapptY = z.y < h.h - 4;
-    if (ueberlapptX && ueberlapptY) {
-      h.getroffen = true;
-      if (z.unverwundbar > 0) return;
-      z.leben--;
-      z.unverwundbar = 1.2;
-      if (z.leben <= 0) z.vorbei = true;
+    if (!ueberlapptX) continue;
+
+    const figurUnten = z.y;
+    const figurOben = z.y + fb;
+    const hUnten = h.unten;
+    const hOben = h.unten + h.h;
+
+    if (figurUnten < hOben - 4 && figurOben > hUnten + 4) {
+      z.vorbei = true;
+      bestwertMerken(Math.floor(z.strecke / 10));
+      break;
     }
-  });
+  }
+}
+
+function bestwert() {
+  try { return Number(localStorage.getItem('videotagebuch.bestwert')) || 0; }
+  catch (e) { return 0; }
+}
+function bestwertMerken(meter) {
+  try {
+    if (meter > bestwert()) {
+      localStorage.setItem('videotagebuch.bestwert', String(meter));
+    }
+  } catch (e) {}
 }
 
 function zeichnen(ctx, z) {
@@ -2126,18 +2189,20 @@ function zeichnen(ctx, z) {
   }
   ctx.stroke();
 
-  // Hindernisse: schlichte Pfosten
-  ctx.fillStyle = '#b5b1a3';
+  // Hindernisse: stehende Pfosten und fliegende Vierecke
   z.hindernisse.forEach(function (o) {
-    ctx.fillRect(Math.round(o.x), Math.round(bodenY - o.h), o.b, o.h);
+    ctx.fillStyle = o.flug ? '#8a877c' : '#b5b1a3';
+    ctx.fillRect(
+      Math.round(o.x),
+      Math.round(bodenY - o.unten - o.h),
+      o.b, o.h
+    );
   });
 
   // Figur: eine kleine Kamera
-  const fx = 34;
+  const fx = SPIEL.FIGUR_X;
   const fy = bodenY - SPIEL.FIGUR - z.y;
-  const blinkt = z.unverwundbar > 0 && Math.floor(z.unverwundbar * 10) % 2 === 0;
 
-  ctx.globalAlpha = blinkt ? 0.35 : 1;
   ctx.fillStyle = '#2c2b26';
   ctx.beginPath();
   ctx.roundRect(fx, fy, SPIEL.FIGUR, SPIEL.FIGUR - 4, 4);
@@ -2149,16 +2214,18 @@ function zeichnen(ctx, z) {
   ctx.beginPath();
   ctx.arc(fx + SPIEL.FIGUR / 2, fy + (SPIEL.FIGUR - 4) / 2, 5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.globalAlpha = 1;
 
-  // Punktestand und Leben
+  // Strecke und Bestwert
   ctx.fillStyle = '#8a877c';
   ctx.font = '12px system-ui, sans-serif';
   ctx.textAlign = 'right';
   ctx.fillText(Math.floor(z.strecke / 10) + ' m', b - 8, 16);
 
-  ctx.textAlign = 'left';
-  ctx.fillText('Leben ' + Math.max(0, z.leben), 8, 16);
+  const best = bestwert();
+  if (best) {
+    ctx.textAlign = 'left';
+    ctx.fillText('Beste ' + best + ' m', 8, 16);
+  }
 
   if (z.vorbei) {
     ctx.fillStyle = 'rgba(250,249,245,.88)';
