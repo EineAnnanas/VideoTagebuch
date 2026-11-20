@@ -1,21 +1,29 @@
-const CACHE_NAME = 'tagebuch-cache-v2';
+const CACHE_NAME = 'tagebuch-cache-v3';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './icons/favicon.svg',
-  './icons/favicon.ico',
-  './icons/favicon-96x96.png',
-  './icons/favicon-192x192.png',
-  './icons/favicon-512x512.png',
-  './icons/apple-touch-icon.png'
+  './assets/icons/favicon.svg',
+  './assets/icons/favicon.ico',
+  './assets/icons/favicon-96x96.png',
+  './assets/icons/favicon-192x192.png',
+  './assets/icons/favicon-512x512.png',
+  './assets/icons/apple-touch-icon.png'
 ];
 
 // 1. Install: pre-cache app shell & activate immediately
 self.addEventListener('install', (e) => {
   self.skipWaiting();
+  // Cache each file individually: with cache.addAll() a single missing file
+  // (e.g. after moving icons) rejects the whole install, the service worker
+  // never activates and navigator.serviceWorker.ready never resolves – which
+  // silently breaks push subscriptions for every new visitor.
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then((cache) => Promise.all(
+      ASSETS.map((asset) => cache.add(asset).catch((err) => {
+        console.warn('[sw] Konnte nicht cachen:', asset, err);
+      }))
+    ))
   );
 });
 
@@ -88,12 +96,18 @@ self.addEventListener('fetch', (e) => {
 
 // 4. Push notifications
 self.addEventListener('push', (e) => {
-  const data = e.data ? e.data.json() : {};
+  // Never let a malformed payload prevent showNotification(): Safari revokes
+  // the push permission if a push event does not display a notification.
+  let data = {};
+  if (e.data) {
+    try { data = e.data.json(); }
+    catch (err) { data = { body: e.data.text() }; }
+  }
   const title = data.title || 'Video Tagebuch Erinnerung';
   const options = {
     body: data.body || 'Zeit für deinen täglichen Tagebucheintrag!',
-    icon: 'icons/favicon-192x192.png',
-    badge: 'icons/favicon-96x96.png',
+    icon: 'assets/icons/favicon-192x192.png',
+    badge: 'assets/icons/favicon-96x96.png',
     data: { url: './' }
   };
   e.waitUntil(self.registration.showNotification(title, options));
