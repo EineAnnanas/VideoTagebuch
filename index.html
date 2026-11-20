@@ -755,6 +755,23 @@
     padding-top: .65rem;
   }
   .settings-uhrzeit-zeile.versteckt { display: none; }
+
+  /* Unteroptionen der Benachrichtigungen */
+  .settings-optionen {
+    margin-top: .75rem;
+    border-top: 1px dashed var(--rand);
+    padding-top: .65rem;
+    display: flex;
+    flex-direction: column;
+    gap: .65rem;
+  }
+  .settings-optionen.versteckt { display: none; }
+  .settings-optionen .settings-uhrzeit-zeile {
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0;
+    padding-left: .75rem;
+  }
   .settings-uhrzeit-zeile label { font-size: .8rem; color: var(--grau); }
   .settings-uhrzeit-zeile input[type="time"] { flex: 0 0 auto; width: 110px; }
 
@@ -892,11 +909,11 @@
 
     <!-- Push-Erinnerungen -->
     <div class="settings-abschnitt">
-      <span class="settings-titel">Erinnerung</span>
+      <span class="settings-titel">Benachrichtigungen</span>
       <div class="settings-schalter-zeile">
         <div class="settings-schalter-beschriftung">
-          <div class="titel">Tägliche Benachrichtigung</div>
-          <div class="untertitel">Erinnert dich an deinen Tagebucheintrag</div>
+          <div class="titel">Benachrichtigungen</div>
+          <div class="untertitel">Push auf diesem Gerät</div>
         </div>
         <label class="schalter">
           <input type="checkbox" id="reminder-toggle">
@@ -904,9 +921,41 @@
         </label>
       </div>
 
-      <div id="settings-time-box" class="settings-uhrzeit-zeile versteckt">
-        <label for="reminder-time">Uhrzeit</label>
-        <input type="time" id="reminder-time" value="20:00">
+      <div id="settings-time-box" class="settings-optionen versteckt">
+        <div class="settings-schalter-zeile">
+          <div class="settings-schalter-beschriftung">
+            <div class="titel">Erinnerung an meinem Tag</div>
+            <div class="untertitel">Nur wenn du dran bist und noch nichts hochgeladen hast</div>
+          </div>
+          <label class="schalter">
+            <input type="checkbox" id="notify-reminder" checked>
+            <span class="schieber"></span>
+          </label>
+        </div>
+        <div id="reminder-time-zeile" class="settings-uhrzeit-zeile">
+          <label for="reminder-time">Uhrzeit</label>
+          <input type="time" id="reminder-time" value="20:00">
+        </div>
+        <div class="settings-schalter-zeile">
+          <div class="settings-schalter-beschriftung">
+            <div class="titel">Neue Kommentare</div>
+            <div class="untertitel">Wenn jemand anderes etwas kommentiert</div>
+          </div>
+          <label class="schalter">
+            <input type="checkbox" id="notify-comments" checked>
+            <span class="schieber"></span>
+          </label>
+        </div>
+        <div class="settings-schalter-zeile">
+          <div class="settings-schalter-beschriftung">
+            <div class="titel">Uploads von anderen</div>
+            <div class="untertitel">Wenn jemand ein neues Video hochlädt</div>
+          </div>
+          <label class="schalter">
+            <input type="checkbox" id="notify-uploads" checked>
+            <span class="schieber"></span>
+          </label>
+        </div>
       </div>
 
       <div id="settings-status"></div>
@@ -1104,6 +1153,36 @@ const rTime = document.getElementById('reminder-time');
 
 rTime.value = localStorage.getItem('tagebuch_reminder_time') || '20:00';
 
+// Which kinds of notifications this device wants (all on by default)
+const nReminder = document.getElementById('notify-reminder');
+const nComments = document.getElementById('notify-comments');
+const nUploads = document.getElementById('notify-uploads');
+const rTimeZeile = document.getElementById('reminder-time-zeile');
+
+function ladePrefs() {
+  try { return JSON.parse(localStorage.getItem('tagebuch_notify_prefs')) || {}; }
+  catch (e) { return {}; }
+}
+(function () {
+  const p = ladePrefs();
+  nReminder.checked = p.reminder !== false;
+  nComments.checked = p.comments !== false;
+  nUploads.checked = p.uploads !== false;
+  rTimeZeile.classList.toggle('versteckt', !nReminder.checked);
+})();
+
+function aktuellePrefs() {
+  return { reminder: nReminder.checked, comments: nComments.checked, uploads: nUploads.checked };
+}
+
+[nReminder, nComments, nUploads].forEach((box) => {
+  box.onchange = () => {
+    rTimeZeile.classList.toggle('versteckt', !nReminder.checked);
+    try { localStorage.setItem('tagebuch_notify_prefs', JSON.stringify(aktuellePrefs())); } catch (e) {}
+    if (rToggle.checked) registerPush();
+  };
+});
+
 function istIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1221,10 +1300,92 @@ rTime.onchange = () => {
   if (rToggle.checked) registerPush();
 };
 
+/** Sends subscription, person and preferences to the server. */
+async function anServerMelden(url, sub) {
+  const res = await fetch(`${url}/api/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({
+      subscription: sub.toJSON(),
+      time: rTime.value,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      person: meinName(),
+      prefs: aktuellePrefs()
+    })
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch (e) {}
+    throw new Error(`Server hat die Anmeldung abgelehnt (HTTP ${res.status}${detail ? ': ' + detail : ''})`);
+  }
+}
+
+/**
+ * Quietly re-sends an existing subscription, e.g. after login or when
+ * "Ich bin" changes, so the server always knows the current person.
+ * Never asks for permission and never shows errors.
+ */
+let zuletztAbgeglichen = '';
+async function pushSynchronisieren() {
+  try {
+    const url = localStorage.getItem('tagebuch_server_url');
+    if (!url || !token || !meinName() || pushNichtMoeglich() !== null) return;
+    if (Notification.permission !== 'granted') return;
+    const stand = meinName() + '|' + JSON.stringify(aktuellePrefs()) + '|' + rTime.value;
+    if (stand === zuletztAbgeglichen) return;   // already up to date this session
+    const reg = await swBereit();
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await anServerMelden(url, sub);
+      zuletztAbgeglichen = stand;
+    }
+  } catch (err) {
+    console.warn('Push-Abgleich fehlgeschlagen:', err);
+  }
+}
+
+/**
+ * Tells the server about an upload or comment so it can notify the
+ * others. Fire and forget: the upload/comment itself already worked.
+ */
+async function benachrichtige(daten) {
+  try {
+    const url = localStorage.getItem('tagebuch_server_url');
+    if (!url || !token) return;
+    let endpoint = null;
+    if (pushNichtMoeglich() === null) {
+      const reg = await swBereit().catch(() => null);
+      const sub = reg && await reg.pushManager.getSubscription();
+      endpoint = sub ? sub.endpoint : null;
+    }
+    await fetch(`${url}/api/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(Object.assign({ from: meinName(), endpoint: endpoint }, daten))
+    });
+  } catch (err) {
+    console.warn('Benachrichtigung an andere fehlgeschlagen:', err);
+  }
+}
+
 async function registerPush() {
   const grund = pushNichtMoeglich();
   if (grund) {
     setStatus(grund, true);
+    deaktivieren();
+    return;
+  }
+
+  // The server needs to know who this device belongs to (own day, not
+  // notifying yourself) and only accepts logged-in project members.
+  // Checked synchronously so we don't leave the user gesture.
+  if (!token) {
+    setStatus('Bitte zuerst mit Google anmelden.', true);
+    deaktivieren();
+    return;
+  }
+  if (!meinName()) {
+    setStatus('Bitte zuerst oben bei „Ich bin“ auswählen, wer du bist.', true);
     deaktivieren();
     return;
   }
@@ -1274,22 +1435,11 @@ async function registerPush() {
       });
     }
 
-    const res = await fetch(`${url}/api/subscribe`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subscription: sub.toJSON(),
-        time: rTime.value,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      })
-    });
-    if (!res.ok) {
-      let detail = '';
-      try { detail = (await res.json()).error || ''; } catch (e) {}
-      throw new Error(`Server hat die Anmeldung abgelehnt (HTTP ${res.status}${detail ? ': ' + detail : ''})`);
-    }
+    await anServerMelden(url, sub);
     localStorage.setItem('tagebuch_reminder_time', rTime.value);
-    setStatus(`Aktiv für ${rTime.value} Uhr`);
+    setStatus(nReminder.checked
+      ? `Aktiv · Erinnerung an deinem Tag um ${rTime.value} Uhr`
+      : 'Aktiv');
   } catch (err) {
     console.error('Push-Aktivierung fehlgeschlagen:', err);
     setStatus(pushFehlerText(err), true);
@@ -3189,7 +3339,12 @@ let kommentare = {};   // Anker-Datei-ID → Liste
 function meinName() {
   const gewaehlt = el.person.options[el.person.selectedIndex];
   if (!gewaehlt || !gewaehlt.value) return '';
-  return gewaehlt.textContent.replace(/^\s*\d+\s*[-_.]?\s*/, '').trim();
+  return ohneNummer(gewaehlt.textContent);
+}
+
+/** Ordnername ohne die Nummer davor. */
+function ohneNummer(ordnerName) {
+  return String(ordnerName || '').replace(/^\s*\d+\s*[-_.]?\s*/, '').trim();
 }
 
 /**
@@ -3302,6 +3457,12 @@ function kommentarBlock(anker) {
     senden.disabled = true;
     try {
       await kommentarSchreiben(anker, text);
+      benachrichtige({
+        type: 'comment',
+        day: anker.tagSchluessel,
+        owner: ohneNummer(anker.ordner),
+        text: text
+      });
       feld.value = '';
       kommentare[anker.id] = await kommentareHolen(anker);
       fuelleKommentarliste(anker, liste, kasten);
@@ -3835,6 +3996,9 @@ document.getElementById('absenden').onclick = async function () {
     );
     // Ein Punkt pro Datei am eigenen Tag, gedeckelt auf fünf pro Woche
     const tagSchluessel = schluessel(fuerTag);
+    // Den anderen Bescheid sagen – ohne darauf zu warten
+    benachrichtige({ type: 'upload', day: tagSchluessel, count: fertige.length });
+
     const bekommen = await punktVermerken(
       meinName(), tagSchluessel, fertige.length
     );
@@ -4187,11 +4351,13 @@ function fuellePersonen() {
 
   if (vorher) el.person.value = vorher;
   dinoBildAktualisieren();
+  pushSynchronisieren();
 }
 
 // Person oder Tag zu wechseln ändert das Tageslimit – neu prüfen.
 el.person.onchange = function () {
   merkePerson();
+  pushSynchronisieren();
   zeichneEntwurf();
   dinoBildAktualisieren();
 };
