@@ -542,246 +542,313 @@
     margin-bottom: 1rem;
   }
   [hidden] { display: none !important; }
-  /* ---- Einstellungen Overlay (im Stil von VideoTagebuch) ---- */
+  /* ---- Einstellungen ---- */
 
-  /* Dezenter Knopf oben rechts */
+  /* Zahnrad oben rechts im Kopf. Der Kopf hält rechts Platz frei,
+     damit umbrechende Knöpfe nie darunter rutschen. Sichtbar 36 px
+     wie die anderen Symbolknöpfe, die Trefferfläche ist aber 44 px. */
+  header {
+    position: relative;
+    padding-right: calc(36px + .6rem);
+  }
   #btn-open-settings {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
+    position: absolute;
+    top: 4px;              /* auf Höhe der Knöpfe neben dem Titel */
+    right: 0;
     width: 36px;
     height: 36px;
-    min-height: 36px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--flaeche);
-    border: 1px solid var(--rand);
     color: var(--grau);
-    border-radius: 6px;
-    cursor: pointer;
-    z-index: 99;
-    box-shadow: 0 2px 6px rgba(44, 43, 38, 0.06);
     transition: background .12s ease, border-color .12s ease, color .12s ease;
   }
-
-  @media (hover: hover) {
-    #btn-open-settings:hover {
-      background: #f3f1e9;
-      border-color: var(--blass);
-      color: var(--text);
-    }
+  #btn-open-settings::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
-  #btn-open-settings:active { background: #eae7db; }
+  #btn-open-settings svg {
+    display: block;
+    transition: transform .3s ease;
+  }
+  @media (hover: hover) {
+    #btn-open-settings:hover { color: var(--text); }
+    #btn-open-settings:hover svg { transform: rotate(30deg); }
+  }
+  #btn-open-settings:active { color: var(--text); }
+  #btn-open-settings:focus-visible { color: var(--text); outline-offset: 2px; }
 
-  /* Hintergrund-Abdunklung (entspricht dem #overlay der Seite) */
+  /* Abdunklung wie bei Bestenliste und Overlay */
   #settings-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(20, 19, 17, 0.7);
-    display: flex;
-    align-items: flex-end; /* Am Handy als Sheet von unten */
-    justify-content: center;
-    padding: 0;
     z-index: 100;
+    display: flex;
+    align-items: flex-end;          /* Am Handy: Blatt von unten */
+    justify-content: center;
+    background: rgba(20, 19, 17, .7);
     opacity: 0;
+    visibility: hidden;             /* Geschlossen auch per Tab nicht erreichbar */
     pointer-events: none;
-    transition: opacity .2s ease;
+    transition: opacity .2s ease, visibility 0s linear .2s;
   }
-
   #settings-backdrop.open {
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
+    transition: opacity .2s ease, visibility 0s;
   }
 
-  /* Das Dialogfeld */
   .settings-karte {
-    background: var(--flaeche);
-    border: 1px solid var(--rand);
+    position: relative;
     width: 100%;
-    max-width: 480px;
-    border-radius: 8px 8px 0 0;
-    padding: 1.25rem 1.25rem 1.75rem;
-    box-shadow: 0 -4px 20px rgba(20, 19, 17, 0.15);
+    max-height: calc(100vh - 2.5rem);
+    max-height: calc(100dvh - 2.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--flaeche);
+    border-top: 1px solid var(--rand);
+    border-radius: 14px 14px 0 0;
+    padding: 1.4rem 1.1rem calc(1.4rem + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(1.1rem + env(safe-area-inset-left, 0px));
+    padding-right: calc(1.1rem + env(safe-area-inset-right, 0px));
+    box-shadow: 0 -6px 24px rgba(20, 19, 17, .18);
     transform: translateY(100%);
-    transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform .28s cubic-bezier(.16, 1, .3, 1);
   }
+  /* Griff-Andeutung oben am Blatt (nur Optik) */
+  .settings-karte::before {
+    content: "";
+    position: absolute;
+    top: .5rem;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--platz);
+  }
+  #settings-backdrop.open .settings-karte { transform: none; }
 
   @media (min-width: 560px) {
     #settings-backdrop {
       align-items: center;
-      padding: 1rem;
+      padding: 1.5rem 1rem;
     }
     .settings-karte {
+      max-width: 460px;
+      max-height: 100%;
+      border: 1px solid var(--rand);
       border-radius: 6px;
-      box-shadow: 0 4px 24px rgba(20, 19, 17, 0.2);
-      transform: scale(0.96);
+      padding: 1.25rem 1.5rem 1.5rem;
+      box-shadow: 0 8px 32px rgba(20, 19, 17, .22);
+      opacity: 0;
+      transform: translateY(8px) scale(.98);
+      transition: transform .22s cubic-bezier(.16, 1, .3, 1), opacity .18s ease;
     }
-    #settings-backdrop.open .settings-karte {
-      transform: scale(1);
-    }
+    .settings-karte::before { display: none; }
+    #settings-backdrop.open .settings-karte { opacity: 1; transform: none; }
   }
 
-  #settings-backdrop.open .settings-karte {
-    transform: translateY(0);
+  @media (prefers-reduced-motion: reduce) {
+    #settings-backdrop,
+    #settings-backdrop.open,
+    .settings-karte,
+    #btn-open-settings svg,
+    .schieber,
+    .schieber::before { transition: none !important; }
+    #btn-open-settings:hover svg { transform: none; }
   }
 
+  /* Kopf wie bei der Bestenliste */
   .settings-kopf {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
+    gap: .6rem;
     border-bottom: 1px solid var(--rand);
     padding-bottom: .6rem;
-    margin-bottom: 1.2rem;
+    margin-bottom: 1.25rem;
   }
-
   .settings-kopf h2 {
     font-family: var(--serif);
     font-size: 1.25rem;
     font-weight: normal;
     margin: 0;
-    color: var(--text);
+  }
+  #btn-close-settings { margin-right: -.4rem; }
+  #btn-close-settings svg { display: block; }
+  @media (hover: hover) {
+    #btn-close-settings:hover:not(:disabled) { color: var(--text); }
   }
 
-  .settings-abschnitt {
-    margin-bottom: 1.25rem;
-  }
-
+  .settings-abschnitt + .settings-abschnitt { margin-top: 1.5rem; }
   .settings-titel {
     display: block;
+    margin: 0 0 .5rem;
     font-size: .72rem;
+    font-weight: normal;
     color: var(--grau);
     text-transform: uppercase;
-    letter-spacing: .04em;
-    margin-bottom: .45rem;
+    letter-spacing: .05em;
+  }
+  .settings-hinweis {
+    display: block;
+    margin-top: .4rem;
+    font-size: .75rem;
+    color: var(--grau);
   }
 
-  /* Eingabefelder */
+  /* Server-Adresse */
   .settings-eingabe-zeile {
     display: flex;
     gap: .45rem;
   }
-
   .settings-eingabe-zeile input[type="url"],
   .settings-uhrzeit-zeile input[type="time"] {
     font: inherit;
     font-size: .84rem;
-    padding: .45rem .65rem;
     min-height: 36px;
+    padding: .45rem .65rem;
     border: 1px solid var(--rand);
     border-radius: 6px;
     background: var(--flaeche);
     color: var(--text);
     outline: none;
-    flex: 1 1 auto;
+    transition: border-color .12s ease;
   }
-
+  .settings-eingabe-zeile input[type="url"] {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .settings-eingabe-zeile input[type="url"]::placeholder { color: var(--blass); }
+  @media (hover: hover) {
+    .settings-eingabe-zeile input[type="url"]:hover,
+    .settings-uhrzeit-zeile input[type="time"]:hover { border-color: var(--blass); }
+  }
   .settings-eingabe-zeile input[type="url"]:focus-visible,
   .settings-uhrzeit-zeile input[type="time"]:focus-visible {
+    border-color: var(--text);
     outline: 2px solid var(--text);
     outline-offset: 1px;
   }
+  .settings-eingabe-zeile button { flex: 0 0 auto; }
 
-  .settings-hinweis {
-    font-size: .73rem;
-    color: var(--grau);
-    margin-top: .35rem;
-    display: block;
+  /* Benachrichtigungen: eine gerahmte Liste mit Trennlinien */
+  .settings-gruppe {
+    border: 1px solid var(--rand);
+    border-radius: 6px;
+    background: var(--papier);
   }
-
-  /* Schalter-Zeile für Push-Benachrichtigungen */
   .settings-schalter-zeile {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: .8rem;
+    gap: 1rem;
+    padding: .7rem .85rem;
   }
-
+  .settings-schalter-beschriftung { min-width: 0; }
   .settings-schalter-beschriftung .titel {
-    font-size: .85rem;
+    font-size: .86rem;
     color: var(--text);
+    line-height: 1.35;
   }
   .settings-schalter-beschriftung .untertitel {
+    margin-top: .1rem;
     font-size: .75rem;
     color: var(--grau);
+    line-height: 1.4;
   }
 
-  /* Klassischer Schalter im Farbschema der Seite (dunkel gefüllt) */
+  /* Unteroptionen erscheinen erst, wenn Push an ist */
+  .settings-optionen {
+    border-top: 1px solid var(--rand);
+    background: var(--flaeche);
+    border-radius: 0 0 6px 6px;
+  }
+  .settings-optionen.versteckt { display: none; }
+  .settings-optionen > .settings-schalter-zeile + .settings-schalter-zeile,
+  .settings-optionen > .settings-uhrzeit-zeile + .settings-schalter-zeile {
+    border-top: 1px solid var(--rand);
+  }
+
+  /* Uhrzeit gehört zur Erinnerung darüber, darum ohne Trennlinie */
+  .settings-uhrzeit-zeile {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: -.2rem .85rem 0 1.6rem;
+    padding: 0 0 .75rem .75rem;
+    border-left: 2px solid var(--platz);
+  }
+  .settings-uhrzeit-zeile.versteckt { display: none; }
+  .settings-uhrzeit-zeile label { font-size: .8rem; color: var(--grau); }
+  .settings-uhrzeit-zeile input[type="time"] { flex: 0 0 auto; width: 116px; }
+
+  /* Schalter im Farbschema der Seite (an = dunkel gefüllt) */
   .schalter {
     position: relative;
+    flex: 0 0 44px;
     width: 44px;
     height: 24px;
-    flex: 0 0 44px;
   }
-  .schalter input { opacity: 0; width: 0; height: 0; }
+  .schalter input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
   .schieber {
     position: absolute;
     inset: 0;
     background: var(--platz);
     border: 1px solid var(--rand);
-    border-radius: 14px;
-    transition: .18s ease;
-    cursor: pointer;
+    border-radius: 12px;
+    transition: background .18s ease, border-color .18s ease;
   }
-  .schieber:before {
-    position: absolute;
+  .schieber::before {
     content: "";
-    height: 16px;
-    width: 16px;
+    position: absolute;
+    top: 3px;
     left: 3px;
-    bottom: 3px;
-    background: var(--flaeche);
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(44, 43, 38, .2);
-    transition: .18s ease;
+    background: var(--flaeche);
+    box-shadow: 0 1px 3px rgba(44, 43, 38, .25);
+    transition: transform .18s ease;
   }
-  input:checked + .schieber {
+  @media (hover: hover) {
+    .schalter input:hover + .schieber { border-color: var(--blass); }
+  }
+  .schalter input:checked + .schieber {
     background: var(--text);
     border-color: var(--text);
   }
-  input:checked + .schieber:before {
+  .schalter input:checked + .schieber::before {
     transform: translateX(20px);
     background: var(--papier);
   }
-
-  /* Uhrzeit-Feld */
-  .settings-uhrzeit-zeile {
-    margin-top: .75rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-top: 1px dashed var(--rand);
-    padding-top: .65rem;
+  .schalter input:focus-visible + .schieber {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
   }
-  .settings-uhrzeit-zeile.versteckt { display: none; }
 
-  /* Unteroptionen der Benachrichtigungen */
-  .settings-optionen {
-    margin-top: .75rem;
-    border-top: 1px dashed var(--rand);
-    padding-top: .65rem;
-    display: flex;
-    flex-direction: column;
-    gap: .65rem;
-  }
-  .settings-optionen.versteckt { display: none; }
-  .settings-optionen .settings-uhrzeit-zeile {
-    margin-top: 0;
-    border-top: 0;
-    padding-top: 0;
-    padding-left: .75rem;
-  }
-  .settings-uhrzeit-zeile label { font-size: .8rem; color: var(--grau); }
-  .settings-uhrzeit-zeile input[type="time"] { flex: 0 0 auto; width: 110px; }
-
-  /* Statusmeldungen (im Stil von #fehler bzw. Hinweisfeldern) */
+  /* Statusmeldung unten (Farben wie #fehler) */
   #settings-status {
-    font-size: .78rem;
-    padding: .5rem .7rem;
-    border-radius: 4px;
-    margin-top: .8rem;
     display: none;
+    margin-top: 1.1rem;
+    padding: .55rem .75rem;
+    border-radius: 4px;
+    font-size: .8rem;
+    line-height: 1.45;
   }
   #settings-status.ok {
     display: block;
@@ -808,6 +875,12 @@
   <button id="wechseln" class="leise" hidden>Konto wechseln</button>
   <button id="handyknopf" class="leise">Handy-Ansicht</button>
   <span id="konto"></span>
+  <button id="btn-open-settings" title="Einstellungen" aria-label="Einstellungen" aria-haspopup="dialog" aria-controls="settings-backdrop">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
 </header>
 
 <div id="hochladen-bereich" hidden>
@@ -881,88 +954,85 @@
 
 <div id="overlay" hidden><div id="overlay-inhalt"></div></div>
 
-<!-- Dezenter Einstellungs-Knopf (oben rechts) -->
-<button id="btn-open-settings" title="Einstellungen" aria-label="Einstellungen">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="3"></circle>
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-  </svg>
-</button>
-
 <!-- Einstellungs-Dialog -->
 <div id="settings-backdrop">
-  <div class="settings-karte">
+  <div class="settings-karte" role="dialog" aria-labelledby="settings-ueberschrift">
     <div class="settings-kopf">
-      <h2>Einstellungen</h2>
-      <button id="btn-close-settings" class="leise symbol" title="Schließen">&times;</button>
+      <h2 id="settings-ueberschrift">Einstellungen</h2>
+      <button id="btn-close-settings" class="leise symbol" title="Schließen" aria-label="Schließen">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M6 6l12 12M18 6L6 18"></path>
+        </svg>
+      </button>
     </div>
 
     <!-- Server URL -->
-    <div class="settings-abschnitt">
-      <span class="settings-titel">Projekt-Server</span>
+    <section class="settings-abschnitt" aria-labelledby="settings-titel-server">
+      <h3 class="settings-titel" id="settings-titel-server"><label for="server-url">Projekt-Server</label></h3>
       <div class="settings-eingabe-zeile">
-        <input type="url" id="server-url" placeholder="https://tagebuch.deinedomain.com" autocomplete="off" spellcheck="false">
+        <input type="url" id="server-url" placeholder="https://tagebuch.deinedomain.com" autocomplete="off" spellcheck="false" aria-describedby="settings-hinweis-server">
         <button id="btn-save-server" class="wichtig">Speichern</button>
       </div>
-      <span class="settings-hinweis">Wird lokal im Browser gespeichert.</span>
-    </div>
+      <span class="settings-hinweis" id="settings-hinweis-server">Wird lokal im Browser gespeichert.</span>
+    </section>
 
-    <!-- Push-Erinnerungen -->
-    <div class="settings-abschnitt">
-      <span class="settings-titel">Benachrichtigungen</span>
-      <div class="settings-schalter-zeile">
-        <div class="settings-schalter-beschriftung">
-          <div class="titel">Benachrichtigungen</div>
-          <div class="untertitel">Push auf diesem Gerät</div>
+    <!-- Push-Benachrichtigungen -->
+    <section class="settings-abschnitt" aria-labelledby="settings-titel-push">
+      <h3 class="settings-titel" id="settings-titel-push">Benachrichtigungen</h3>
+      <div class="settings-gruppe">
+        <div class="settings-schalter-zeile">
+          <div class="settings-schalter-beschriftung">
+            <div class="titel" id="reminder-toggle-titel">Push-Benachrichtigungen</div>
+            <div class="untertitel" id="reminder-toggle-text">Auf diesem Gerät erhalten</div>
+          </div>
+          <label class="schalter">
+            <input type="checkbox" id="reminder-toggle" role="switch" aria-labelledby="reminder-toggle-titel" aria-describedby="reminder-toggle-text">
+            <span class="schieber" aria-hidden="true"></span>
+          </label>
         </div>
-        <label class="schalter">
-          <input type="checkbox" id="reminder-toggle">
-          <span class="schieber"></span>
-        </label>
+
+        <div id="settings-time-box" class="settings-optionen versteckt">
+          <div class="settings-schalter-zeile">
+            <div class="settings-schalter-beschriftung">
+              <div class="titel" id="notify-reminder-titel">Erinnerung an meinem Tag</div>
+              <div class="untertitel" id="notify-reminder-text">Nur wenn du dran bist und noch nichts hochgeladen hast</div>
+            </div>
+            <label class="schalter">
+              <input type="checkbox" id="notify-reminder" role="switch" checked aria-labelledby="notify-reminder-titel" aria-describedby="notify-reminder-text">
+              <span class="schieber" aria-hidden="true"></span>
+            </label>
+          </div>
+          <div id="reminder-time-zeile" class="settings-uhrzeit-zeile">
+            <label for="reminder-time">Uhrzeit</label>
+            <input type="time" id="reminder-time" value="20:00">
+          </div>
+          <div class="settings-schalter-zeile">
+            <div class="settings-schalter-beschriftung">
+              <div class="titel" id="notify-comments-titel">Neue Kommentare</div>
+              <div class="untertitel" id="notify-comments-text">Wenn jemand anderes etwas kommentiert</div>
+            </div>
+            <label class="schalter">
+              <input type="checkbox" id="notify-comments" role="switch" checked aria-labelledby="notify-comments-titel" aria-describedby="notify-comments-text">
+              <span class="schieber" aria-hidden="true"></span>
+            </label>
+          </div>
+          <div class="settings-schalter-zeile">
+            <div class="settings-schalter-beschriftung">
+              <div class="titel" id="notify-uploads-titel">Uploads von anderen</div>
+              <div class="untertitel" id="notify-uploads-text">Wenn jemand ein neues Video hochlädt</div>
+            </div>
+            <label class="schalter">
+              <input type="checkbox" id="notify-uploads" role="switch" checked aria-labelledby="notify-uploads-titel" aria-describedby="notify-uploads-text">
+              <span class="schieber" aria-hidden="true"></span>
+            </label>
+          </div>
+        </div>
       </div>
+    </section>
 
-      <div id="settings-time-box" class="settings-optionen versteckt">
-        <div class="settings-schalter-zeile">
-          <div class="settings-schalter-beschriftung">
-            <div class="titel">Erinnerung an meinem Tag</div>
-            <div class="untertitel">Nur wenn du dran bist und noch nichts hochgeladen hast</div>
-          </div>
-          <label class="schalter">
-            <input type="checkbox" id="notify-reminder" checked>
-            <span class="schieber"></span>
-          </label>
-        </div>
-        <div id="reminder-time-zeile" class="settings-uhrzeit-zeile">
-          <label for="reminder-time">Uhrzeit</label>
-          <input type="time" id="reminder-time" value="20:00">
-        </div>
-        <div class="settings-schalter-zeile">
-          <div class="settings-schalter-beschriftung">
-            <div class="titel">Neue Kommentare</div>
-            <div class="untertitel">Wenn jemand anderes etwas kommentiert</div>
-          </div>
-          <label class="schalter">
-            <input type="checkbox" id="notify-comments" checked>
-            <span class="schieber"></span>
-          </label>
-        </div>
-        <div class="settings-schalter-zeile">
-          <div class="settings-schalter-beschriftung">
-            <div class="titel">Uploads von anderen</div>
-            <div class="untertitel">Wenn jemand ein neues Video hochlädt</div>
-          </div>
-          <label class="schalter">
-            <input type="checkbox" id="notify-uploads" checked>
-            <span class="schieber"></span>
-          </label>
-        </div>
-      </div>
-
-      <div id="settings-status"></div>
-    </div>
+    <div id="settings-status" role="status" aria-live="polite"></div>
   </div>
 </div>
-
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 // ============ EINSTELLUNGEN ============
