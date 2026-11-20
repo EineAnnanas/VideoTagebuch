@@ -1068,11 +1068,14 @@ document.getElementById('btn-open-settings').onclick = () => settingsBackdrop.cl
 document.getElementById('btn-close-settings').onclick = () => settingsBackdrop.classList.remove('open');
 settingsBackdrop.onclick = (e) => { if (e.target === settingsBackdrop) settingsBackdrop.classList.remove('open'); };
 
+let statusTimer = null;
 function setStatus(msg, err = false) {
   statusDiv.textContent = msg;
   statusDiv.className = err ? 'fehler' : 'ok';
   statusDiv.style.display = 'block';
-  setTimeout(() => statusDiv.style.display = 'none', 4000);
+  clearTimeout(statusTimer);
+  // Errors stay longer so they can actually be read / screenshotted.
+  statusTimer = setTimeout(() => statusDiv.style.display = 'none', err ? 15000 : 4000);
 }
 
 // Save Server URL
@@ -1099,14 +1102,92 @@ const rToggle = document.getElementById('reminder-toggle');
 const rTimeBox = document.getElementById('settings-time-box');
 const rTime = document.getElementById('reminder-time');
 
-navigator.serviceWorker?.ready?.then(async (reg) => {
-  const sub = await reg.pushManager.getSubscription();
-  if (sub) {
-    rToggle.checked = true;
-    rTimeBox.classList.remove('versteckt');
+rTime.value = localStorage.getItem('tagebuch_reminder_time') || '20:00';
+
+function istIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function istInstalliert() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    navigator.standalone === true;
+}
+
+// Returns a human readable reason why push cannot work here, or null.
+function pushNichtMoeglich() {
+  if (!window.isSecureContext) return 'Benachrichtigungen gehen nur über https.';
+  const fehlt = !('serviceWorker' in navigator) || !('PushManager' in window) ||
+    !('Notification' in window);
+  if (!fehlt) return null;
+  if (istIOS() && !istInstalliert()) {
+    return 'Auf iPhone/iPad gehen Benachrichtigungen nur, wenn die Seite über ' +
+      '„Teilen → Zum Home-Bildschirm“ installiert und von dort geöffnet wird (ab iOS 16.4).';
   }
-  rTime.value = localStorage.getItem('tagebuch_reminder_time') || '20:00';
-});
+  return 'Dieser Browser unterstützt keine Push-Benachrichtigungen.';
+}
+
+// navigator.serviceWorker.ready never settles if the worker fails to
+// install – fail with a clear message instead of hanging forever.
+function swBereit(ms = 10000) {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(
+      'Service Worker nicht aktiv. Seite neu laden und erneut versuchen.')), ms))
+  ]);
+}
+
+function keyZuBytes(base64url) {
+  const clean = base64url.trim();
+  const padding = '='.repeat((4 - (clean.length % 4)) % 4);
+  const raw = window.atob((clean + padding).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+function gleicherKey(sub, keyArr) {
+  const vorhanden = sub.options && sub.options.applicationServerKey;
+  if (!vorhanden) return true; // unknown, assume ok
+  const a = new Uint8Array(vorhanden);
+  return a.length === keyArr.length && a.every((b, i) => b === keyArr[i]);
+}
+
+// Supports both the promise and the legacy callback form (old Safari).
+function berechtigungAnfragen() {
+  return new Promise((resolve) => {
+    const r = Notification.requestPermission(resolve);
+    if (r && typeof r.then === 'function') r.then(resolve);
+  });
+}
+
+function pushFehlerText(err) {
+  const name = (err && err.name) || '';
+  const msg = (err && err.message) || String(err);
+  if (name === 'NotAllowedError') {
+    return 'Benachrichtigungen sind für diese Seite blockiert (Browser-/Systemeinstellungen prüfen).';
+  }
+  if (name === 'AbortError' || /push service/i.test(msg)) {
+    return 'Push-Dienst des Browsers nicht erreichbar. In Brave: brave://settings/privacy → ' +
+      '„Google-Dienste für Push-Nachrichten verwenden“ aktivieren. (' + msg + ')';
+  }
+  if (name === 'InvalidCharacterError' || name === 'InvalidAccessError') {
+    return 'Ungültiger VAPID-Schlüssel vom Server (' + msg + ')';
+  }
+  return 'Fehler beim Aktivieren: ' + (name ? name + ': ' : '') + msg;
+}
+
+if (pushNichtMoeglich() === null) {
+  swBereit().then(async (reg) => {
+    const sub = await reg.pushManager.getSubscription();
+    if (sub && Notification.permission === 'granted') {
+      rToggle.checked = true;
+      rTimeBox.classList.remove('versteckt');
+    }
+  }).catch(console.warn);
+}
+
+function deaktivieren() {
+  rToggle.checked = false;
+  rTimeBox.classList.add('versteckt');
+}
 
 rToggle.onchange = async () => {
   if (rToggle.checked) {
@@ -1114,10 +1195,25 @@ rToggle.onchange = async () => {
     await registerPush();
   } else {
     rTimeBox.classList.add('versteckt');
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    if (sub) await sub.unsubscribe();
-    setStatus('Erinnerung deaktiviert');
+    try {
+      const reg = await swBereit();
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        const url = localStorage.getItem('tagebuch_server_url');
+        if (url) {
+          fetch(`${url}/api/unsubscribe`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint })
+          }).catch(console.warn);
+        }
+        await sub.unsubscribe();
+      }
+      setStatus('Erinnerung deaktiviert');
+    } catch (err) {
+      console.error(err);
+      setStatus('Fehler beim Deaktivieren: ' + (err.message || err), true);
+    }
   }
 };
 
@@ -1126,47 +1222,78 @@ rTime.onchange = () => {
 };
 
 async function registerPush() {
-  const url = localStorage.getItem('tagebuch_server_url');
-  if (!url || !CONFIG.VAPID_PUBLIC_KEY) {
-    setStatus('Erst Server-URL speichern!', true);
-    rToggle.checked = false;
-    rTimeBox.classList.add('versteckt');
+  const grund = pushNichtMoeglich();
+  if (grund) {
+    setStatus(grund, true);
+    deaktivieren();
     return;
   }
+
+  // Ask for permission first, while we are still inside the user gesture
+  // (Safari and Firefox reject requestPermission() after an await).
+  let perm;
   try {
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') {
-      setStatus('Berechtigung verweigert', true);
-      rToggle.checked = false;
-      return;
+    perm = await berechtigungAnfragen();
+  } catch (err) {
+    console.error(err);
+    setStatus(pushFehlerText(err), true);
+    deaktivieren();
+    return;
+  }
+  if (perm !== 'granted') {
+    setStatus(perm === 'denied'
+      ? 'Benachrichtigungen blockiert – in den Browser-/Systemeinstellungen erlauben.'
+      : 'Berechtigung nicht erteilt', true);
+    deaktivieren();
+    return;
+  }
+
+  const url = localStorage.getItem('tagebuch_server_url');
+  if (url && !CONFIG.VAPID_PUBLIC_KEY) await ensureServerConfig();
+  if (!url || !CONFIG.VAPID_PUBLIC_KEY) {
+    setStatus(url ? 'Server liefert keinen VAPID-Schlüssel' : 'Erst Server-URL speichern!', true);
+    deaktivieren();
+    return;
+  }
+
+  try {
+    const reg = await swBereit();
+    const keyArr = keyZuBytes(CONFIG.VAPID_PUBLIC_KEY);
+
+    // An existing subscription for a different VAPID key makes subscribe()
+    // fail with InvalidStateError – drop it and subscribe again.
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && !gleicherKey(sub, keyArr)) {
+      await sub.unsubscribe();
+      sub = null;
+    }
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: keyArr
+      });
     }
 
-    const reg = await navigator.serviceWorker.ready;
-    const padding = '='.repeat((4 - (CONFIG.VAPID_PUBLIC_KEY.length % 4)) % 4);
-    const key = (CONFIG.VAPID_PUBLIC_KEY + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const raw = window.atob(key);
-    const keyArr = Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
-
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: keyArr
-    });
-    localStorage.setItem('tagebuch_reminder_time', rTime.value);
-
-    await fetch(`${url}/api/subscribe`, {
+    const res = await fetch(`${url}/api/subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        subscription: sub,
+        subscription: sub.toJSON(),
         time: rTime.value,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
       })
     });
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.json()).error || ''; } catch (e) {}
+      throw new Error(`Server hat die Anmeldung abgelehnt (HTTP ${res.status}${detail ? ': ' + detail : ''})`);
+    }
+    localStorage.setItem('tagebuch_reminder_time', rTime.value);
     setStatus(`Aktiv für ${rTime.value} Uhr`);
   } catch (err) {
-    console.error(err);
-    setStatus('Fehler beim Aktivieren', true);
-    rToggle.checked = false;
+    console.error('Push-Aktivierung fehlgeschlagen:', err);
+    setStatus(pushFehlerText(err), true);
+    deaktivieren();
   }
 }
 
