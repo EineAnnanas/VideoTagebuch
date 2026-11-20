@@ -1,3 +1,5 @@
+name: tagebuch-server
+
 services:
   reminder-api:
     build: .

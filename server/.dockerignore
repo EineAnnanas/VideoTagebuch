@@ -1,0 +1,5 @@
+npm
+data
+backup-*
+.env
+node_modules
