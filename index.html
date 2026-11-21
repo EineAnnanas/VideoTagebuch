@@ -489,12 +489,17 @@
     flex: 0 0 auto;
   }
   #overlay .leiste .gruppe.aktionen { margin-left: auto; }
-  #overlay .leiste .behalten-knopf {
+  #overlay .leiste .behalten-knopf,
+  #overlay .leiste .lade-knopf {
     min-width: 36px;
     display: inline-flex; align-items: center; justify-content: center;
     color: var(--grau);
   }
-  #overlay .leiste .behalten-knopf svg { display: block; }
+  #overlay .leiste .behalten-knopf svg,
+  #overlay .leiste .lade-knopf svg { display: block; }
+  @media (hover: hover) {
+    #overlay .leiste .lade-knopf:hover { color: var(--text); }
+  }
   #overlay .leiste .behalten-knopf[aria-pressed="true"] { color: #b8860b; }
   #overlay .leiste .behalten {
     font-size: .76rem;
@@ -2645,8 +2650,10 @@ function spielLeiste(datei, url) {
   const aktionen = gruppe('aktionen');
   if (!datei.vorschau) {
     const laden = document.createElement('button');
-    laden.className = 'leise';
-    laden.textContent = 'Herunterladen';
+    laden.className = 'leise lade-knopf';
+    laden.innerHTML = LADEN_SYMBOL;
+    laden.setAttribute('aria-label', 'Herunterladen');
+    laden.title = 'Herunterladen';
     laden.onclick = function () {
       const a = document.createElement('a');
       a.href = url;
@@ -2674,6 +2681,9 @@ function spielLeiste(datei, url) {
 // Video überhaupt markiert ist und ob von mir.
 
 let markierungen = {};   // Datei-ID → { markiert, meins }
+
+// Pfeil nach unten in eine Ablage: "Herunterladen"
+const LADEN_SYMBOL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10.5l5 5 5-5"/><path d="M5 19.5h14"/></svg>';
 
 const STERN_LEER = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.6l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
 const STERN_VOLL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.6l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
