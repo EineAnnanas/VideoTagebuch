@@ -2940,10 +2940,15 @@ const DINO = {
 // Jeder bekommt seinen eigenen Dino, abgeleitet vom Namen.
 const DINO_FARBEN = ['doux', 'mort', 'tard', 'vita'];
 
+// Die Sprite-Sheets liegen in assets/dinos/
+function dinoPfad() {
+  return 'assets/dinos/dino-' + dinoFarbe() + '.png';
+}
+
 const dinoBild = new Image();
 let dinoGeladen = false;
 dinoBild.onload = function () { dinoGeladen = true; };
-dinoBild.src = 'assets/dino/dino-' + dinoFarbe() + '.png';
+dinoBild.src = dinoPfad();
 
 function dinoFarbe() {
   let name = '';
@@ -2955,7 +2960,7 @@ function dinoFarbe() {
 
 /** Beim Wechsel der Person den passenden Dino nachladen. */
 function dinoBildAktualisieren() {
-  const neu = 'dino-' + dinoFarbe() + '.png';
+  const neu = dinoPfad();
   if (dinoBild.getAttribute('src') === neu) return;
   dinoGeladen = false;
   dinoBild.src = neu;
