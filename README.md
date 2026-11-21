@@ -235,12 +235,19 @@ es die Seite: Beim Öffnen entfernt sie **die eigenen** Videos, die
 älter als 30 Tage sind, endgültig und ohne Umweg über den Papierkorb
 (der belegt weiter Speicher).
 
-Vier Bedingungen müssen zusammenkommen: Die Datei gehört dem
+Fünf Bedingungen müssen zusammenkommen: Die Datei gehört dem
 angemeldeten Konto, Drive bestätigt selbst das Löschrecht, sie liegt
-im Projektordner, und sie ist älter als die Aufbewahrungszeit.
-Maßgeblich ist der echte Upload-Zeitpunkt, nicht das Datum im
-Dateinamen – ein nachgereichtes Video verschwindet also nicht
-vorzeitig.
+im Projektordner, sie ist älter als die Aufbewahrungszeit – und der
+Server hat sie bereits **archiviert**. Maßgeblich ist der echte
+Upload-Zeitpunkt, nicht das Datum im Dateinamen – ein nachgereichtes
+Video verschwindet also nicht vorzeitig.
+
+Ob ein Video archiviert ist, fragt die Seite unter
+`/api/archiv/status` beim Server nach. Ist es das nicht (oder ist der
+Server nicht erreichbar), bleibt es liegen – aber höchstens bis
+`ARCHIV_SPAETESTENS_TAGE` (45 Tage). Danach wird trotzdem gelöscht,
+damit der Speicher nicht volläuft, falls der Pi länger ausfällt. In
+der Wiedergabe steht bei abgelaufenen Videos „wird archiviert“.
 
 Abschalten mit `AUTO_LOESCHEN: false`.
 

@@ -1059,6 +1059,11 @@ let CONFIG = {
 
   AUFBEWAHRUNG_TAGE: 30,
 
+  // Nach Ablauf wird erst gelöscht, wenn der Server das Video
+  // archiviert hat. Spätestens nach so vielen Tagen aber trotzdem,
+  // damit der Speicher nicht volläuft, falls der Pi länger ausfällt.
+  ARCHIV_SPAETESTENS_TAGE: 45,
+
   // Wie lange ein Bild beim Abspielen stehen bleibt.
   BILD_SEKUNDEN: 4,
 
@@ -1992,11 +1997,16 @@ async function laden() {
 /**
  * Entfernt die eigenen abgelaufenen Videos endgültig.
  *
- * Vier Bedingungen müssen zusammenkommen, sonst passiert nichts:
+ * Fünf Bedingungen müssen zusammenkommen, sonst passiert nichts:
  *   – die Datei gehört dem angemeldeten Konto
  *   – Drive bestätigt selbst, dass gelöscht werden darf
  *   – sie liegt im Projektordner (etwas anderes lädt die Seite nie)
  *   – sie ist älter als die Aufbewahrungszeit
+ *   – der Server hat sie archiviert – oder sie ist älter als
+ *     ARCHIV_SPAETESTENS_TAGE, falls der Pi nicht hinterherkommt
+ *
+ * Ist der Server nicht erreichbar, gilt nichts als archiviert. Dann
+ * wird erst nach ARCHIV_SPAETESTENS_TAGE gelöscht, nie früher.
  *
  * Maßgeblich ist der echte Upload-Zeitpunkt, nicht das Datum im
  * Dateinamen. Ein nachgereichtes Video verschwindet dadurch nicht
@@ -2005,13 +2015,18 @@ async function laden() {
  * Endgültig statt Papierkorb: Der Papierkorb belegt weiter Speicher.
  */
 async function aufraeumen() {
-  const grenze = Date.now() - CONFIG.AUFBEWAHRUNG_TAGE * 86400000;
+  const jetzt = Date.now();
 
-  const abgelaufen = dateien.filter(function (d) {
-    const meins = d.owners
-      && d.owners.some(function (o) { return o.emailAddress === meineMail; });
-    const darf = !d.capabilities || d.capabilities.canDelete !== false;
-    return meins && darf && new Date(d.createdTime).getTime() < grenze;
+  // Erst ohne Server prüfen: Nur wenn überhaupt etwas abgelaufen ist,
+  // lohnt sich die Nachfrage, was schon archiviert ist.
+  const kandidaten = dateien.filter(function (d) {
+    return darfLoeschen(d, jetzt, null);
+  });
+  if (!kandidaten.length) return;
+
+  const bereit = await archivBereit();
+  const abgelaufen = kandidaten.filter(function (d) {
+    return darfLoeschen(d, jetzt, bereit);
   });
 
   if (!abgelaufen.length) return;
@@ -2039,6 +2054,48 @@ async function aufraeumen() {
       ? 'Ein abgelaufenes Video wurde gelöscht.'
       : geloescht.length + ' abgelaufene Videos wurden gelöscht.';
     el.aufgeraeumt.hidden = false;
+  }
+}
+
+/**
+ * Darf diese Datei jetzt gelöscht werden? Ohne Seiteneffekte, damit
+ * sich die Regel einzeln prüfen lässt.
+ *
+ * bereitSet: IDs, die der Server archiviert hat. null heißt „noch
+ * nicht nachgefragt“ – dann zählt nur, ob die Datei überhaupt
+ * abgelaufen ist (Vorauswahl in aufraeumen()).
+ */
+function darfLoeschen(datei, jetztMs, bereitSet) {
+  const meins = datei.owners
+    && datei.owners.some(function (o) { return o.emailAddress === meineMail; });
+  const darf = !datei.capabilities || datei.capabilities.canDelete !== false;
+  if (!meins || !darf) return false;
+
+  const alter = jetztMs - new Date(datei.createdTime).getTime();
+  if (alter <= CONFIG.AUFBEWAHRUNG_TAGE * 86400000) return false;
+  if (bereitSet === null) return true;
+
+  return bereitSet.has(datei.id)
+      || alter > CONFIG.ARCHIV_SPAETESTENS_TAGE * 86400000;
+}
+
+/**
+ * Fragt den Server, welche Dateien schon archiviert sind. Bei jedem
+ * Fehler eine leere Menge – dann wird lieber gewartet als gelöscht.
+ */
+async function archivBereit() {
+  try {
+    const url = localStorage.getItem('tagebuch_server_url');
+    if (!url) throw new Error('keine Server-URL');
+    const antwort = await fetch(url + '/api/archiv/status', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!antwort.ok) throw new Error('HTTP ' + antwort.status);
+    const daten = await antwort.json();
+    return new Set(Array.isArray(daten.bereit) ? daten.bereit : []);
+  } catch (e) {
+    console.warn('Archivstatus nicht abrufbar, es wird nichts vorzeitig gelöscht:', e);
+    return new Set();
   }
 }
 
@@ -2509,8 +2566,10 @@ function spielLeiste(datei, url) {
   info.className = 'info';
   info.textContent = datei.vorschau
     ? zaehler + datei.name + ' · ' + mb(datei.size) + ' MB · noch nicht hochgeladen'
-    : zaehler + datei.ordner + ' · ' + mb(datei.size)
-      + ' MB · noch ' + tageBisLoeschung(datei.createdTime) + ' Tage';
+    : zaehler + datei.ordner + ' · ' + mb(datei.size) + ' MB · '
+      + (tageBisLoeschung(datei.createdTime) > 0
+          ? 'noch ' + tageBisLoeschung(datei.createdTime) + ' Tage'
+          : 'wird archiviert');
   l.appendChild(info);
 
   if (gesamt > 1) {

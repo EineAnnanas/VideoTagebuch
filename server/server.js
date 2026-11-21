@@ -28,6 +28,13 @@ db.serialize(() => {
     timezone TEXT
   )`);
 
+  // Archived videos. Filled by the archiver (#6, phase 3); for now
+  // only the status matters: 'bereit' = safe to delete in Drive.
+  db.run(`CREATE TABLE IF NOT EXISTS archiv (
+    file_id TEXT PRIMARY KEY,
+    status TEXT
+  )`);
+
   db.all('PRAGMA table_info(reminders)', (err, cols) => {
     if (err) return console.error('[db] Migration fehlgeschlagen:', err);
     const vorhanden = new Set(cols.map(c => c.name));
@@ -206,6 +213,17 @@ app.post('/api/subscribe', requireMember, (req, res) => {
     console.log(`[subscribe] ${endpointHost(subscription.endpoint)} ${person.trim()} um ${time} (${tz})`
       + ` erinnerung=${flag(p.reminder)} kommentare=${flag(p.comments)} uploads=${flag(p.uploads)}`);
     res.json({ success: true });
+  });
+});
+
+// Which Drive files are archived and may be deleted by the app's cleanup.
+app.get('/api/archiv/status', requireMember, (req, res) => {
+  db.all("SELECT file_id FROM archiv WHERE status = 'bereit'", (err, rows) => {
+    if (err) {
+      console.error('[archiv] DB-Fehler:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ bereit: (rows || []).map(r => r.file_id) });
   });
 });
 
