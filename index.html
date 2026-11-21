@@ -307,6 +307,17 @@
     text-shadow: 0 0 10px rgba(0,0,0,.8);
     pointer-events: none;
   }
+  .kachel .herz {
+    position: absolute; top: 3px; right: 3px;
+    min-width: 18px; height: 18px; padding: 0 4px;
+    display: flex; align-items: center; justify-content: center; gap: 2px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .92);
+    color: #b3392b;
+    font-size: .62rem; line-height: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+    pointer-events: none;
+  }
   .kachel .wartet {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -463,6 +474,17 @@
     font-size: .8rem;
   }
   #overlay .leiste .info { color: var(--grau); margin-right: auto; }
+  #overlay .leiste .like {
+    display: inline-flex; align-items: center; gap: .3rem;
+    min-width: 36px;
+  }
+  #overlay .leiste .like .zeichen { font-size: 1rem; line-height: 1; }
+  #overlay .leiste .like[aria-pressed="true"] .zeichen { color: #b3392b; }
+  #overlay .leiste .like-namen {
+    flex-basis: 100%;
+    order: 10;
+    font-size: .75rem; color: var(--grau);
+  }
   #overlay .ladeanzeige { padding: 3rem 1rem; text-align: center; color: var(--grau); }
   #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .85rem; }
   #overlay .ersatz p { color: var(--grau); }
@@ -1980,7 +2002,7 @@ async function laden() {
     await punkteLaden();
 
     kommentare = {};
-    await kommentareVorladen(alleAnker());
+    await Promise.all([kommentareVorladen(alleAnker()), likesLaden()]);
     cacheAufraeumen();          // nebenher
 
     el.status.hidden = true;
@@ -2254,6 +2276,9 @@ function kachel(datei, gruppe, index) {
     play.textContent = '▶';
     k.appendChild(play);
   }
+
+  k.dataset.id = datei.id;
+  herzMarke(k, datei.id);
 
   k.onclick = function () { oeffneOverlay(gruppe, index); };
   return k;
@@ -2590,6 +2615,8 @@ function spielLeiste(datei, url) {
     l.appendChild(weiter);
   }
 
+  if (!datei.vorschau) likeKnopf(l, datei);
+
   if (!datei.vorschau) {
     const laden = document.createElement('button');
     laden.className = 'leise';
@@ -2609,6 +2636,140 @@ function spielLeiste(datei, url) {
   l.appendChild(zu);
 
   return l;
+}
+
+// ============ LIKES ============
+//
+// Wer ein Video mag, tippt aufs Herz. Ab einem Like ist es ein
+// Highlight: Das Archiv (#6) behält dann das Original. Gespeichert
+// wird auf dem Projekt-Server, weil die Likes die Drive-Datei
+// überleben müssen.
+
+let likes = {};   // Datei-ID → Liste der Namen
+
+async function likesLaden() {
+  const url = localStorage.getItem('tagebuch_server_url');
+  if (!url || !token) return;
+  try {
+    const antwort = await fetch(url + '/api/likes', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!antwort.ok) throw new Error('HTTP ' + antwort.status);
+    likes = await antwort.json() || {};
+  } catch (e) {
+    console.warn('Likes konnten nicht geladen werden:', e);
+    likes = {};
+  }
+}
+
+function likesVon(id) { return likes[id] || []; }
+
+function magIch(id) {
+  const ich = meinName().toLowerCase();
+  return !!ich && likesVon(id).some(function (n) { return n.toLowerCase() === ich; });
+}
+
+/** Kleines Herz oben rechts auf der Kachel, sobald jemand das Video mag. */
+function herzMarke(k, id) {
+  const alt = k.querySelector('.herz');
+  if (alt) alt.remove();
+  const anzahl = likesVon(id).length;
+  if (!anzahl) return;
+  const herz = document.createElement('span');
+  herz.className = 'herz';
+  herz.textContent = '♥' + (anzahl > 1 ? ' ' + anzahl : '');
+  herz.setAttribute('aria-label', anzahl === 1 ? '1 Like' : anzahl + ' Likes');
+  k.appendChild(herz);
+}
+
+function herzenAktualisieren(id) {
+  document.querySelectorAll('.kachel').forEach(function (k) {
+    if (k.dataset.id === id) herzMarke(k, id);
+  });
+}
+
+async function likeSenden(id, an) {
+  const url = localStorage.getItem('tagebuch_server_url');
+  if (!url) throw new Error('Erst Server-URL in den Einstellungen speichern.');
+  const antwort = await fetch(url + '/api/like', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ fileId: id, person: meinName(), an: an })
+  });
+  if (!antwort.ok) throw new Error('Like konnte nicht gespeichert werden ('
+                                 + antwort.status + ').');
+  return (await antwort.json()).persons || [];
+}
+
+/** Herz-Knopf in der Leiste unter dem Video, mit Liste der Namen. */
+function likeKnopf(leiste, datei) {
+  const knopf = document.createElement('button');
+  knopf.className = 'leise like';
+  const zeichen = document.createElement('span');
+  zeichen.className = 'zeichen';
+  zeichen.setAttribute('aria-hidden', 'true');
+  const zahl = document.createElement('span');
+  knopf.appendChild(zeichen);
+  knopf.appendChild(zahl);
+
+  const namen = document.createElement('div');
+  namen.className = 'like-namen';
+  namen.hidden = true;
+
+  function zeige() {
+    const liste = likesVon(datei.id);
+    const an = magIch(datei.id);
+    zeichen.textContent = an ? '♥' : '♡';
+    zahl.textContent = liste.length ? String(liste.length) : '';
+    knopf.setAttribute('aria-pressed', an ? 'true' : 'false');
+    knopf.setAttribute('aria-label', (an ? 'Gefällt mir nicht mehr' : 'Gefällt mir')
+      + (liste.length ? ' (' + liste.length + ')' : ''));
+    knopf.title = liste.length ? 'Gefällt: ' + liste.join(', ') : 'Gefällt mir';
+    namen.textContent = liste.length ? '♥ ' + liste.join(', ') : '';
+    if (!liste.length) namen.hidden = true;
+  }
+
+  knopf.onclick = async function () {
+    if (!meinName()) {
+      zeigeFehler('Bitte oben bei "Ich bin" auswählen, wer du bist – '
+                + 'sonst weiß niemand, wem das Video gefällt.');
+      return;
+    }
+    const vorher = likesVon(datei.id).slice();
+    const an = !magIch(datei.id);
+    const ich = meinName().toLowerCase();
+
+    // Sofort anzeigen, bei einem Fehler zurückdrehen
+    likes[datei.id] = an
+      ? vorher.concat([ich])
+      : vorher.filter(function (n) { return n.toLowerCase() !== ich; });
+    if (likesVon(datei.id).length) namen.hidden = false;
+    zeige();
+    herzenAktualisieren(datei.id);
+
+    knopf.disabled = true;
+    try {
+      likes[datei.id] = await likeSenden(datei.id, an);
+    } catch (fehler) {
+      likes[datei.id] = vorher;
+      zeigeFehler(fehler.message);
+    } finally {
+      knopf.disabled = false;
+      zeige();
+      herzenAktualisieren(datei.id);
+    }
+  };
+
+  // Auf die Zahl tippen klappt die Namen auf, ohne zu liken
+  zahl.onclick = function (e) {
+    if (!likesVon(datei.id).length) return;
+    e.stopPropagation();
+    namen.hidden = !namen.hidden;
+  };
+
+  zeige();
+  leiste.appendChild(knopf);
+  leiste.appendChild(namen);
 }
 
 // ============ PUNKTE ============

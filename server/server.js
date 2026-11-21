@@ -35,6 +35,15 @@ db.serialize(() => {
     status TEXT
   )`);
 
+  // Likes: one row per (file, person). >= 1 like makes a video a
+  // highlight, whose original the archiver keeps (#6).
+  db.run(`CREATE TABLE IF NOT EXISTS likes (
+    file_id TEXT NOT NULL,
+    person TEXT NOT NULL,
+    created INTEGER NOT NULL,
+    PRIMARY KEY (file_id, person)
+  )`);
+
   db.all('PRAGMA table_info(reminders)', (err, cols) => {
     if (err) return console.error('[db] Migration fehlgeschlagen:', err);
     const vorhanden = new Set(cols.map(c => c.name));
@@ -225,6 +234,59 @@ app.get('/api/archiv/status', requireMember, (req, res) => {
     }
     res.json({ bereit: (rows || []).map(r => r.file_id) });
   });
+});
+
+// ============ LIKES ============
+
+const FILE_ID_RE = /^[A-Za-z0-9_-]{1,100}$/;
+
+function likesFor(fileId, cb) {
+  db.all('SELECT person FROM likes WHERE file_id = ? ORDER BY created', [fileId],
+    (err, rows) => cb(err, (rows || []).map(r => r.person)));
+}
+
+// All likes as { fileId: [persons] }
+app.get('/api/likes', requireMember, (req, res) => {
+  db.all('SELECT file_id, person FROM likes ORDER BY created', (err, rows) => {
+    if (err) {
+      console.error('[likes] DB-Fehler:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    const out = {};
+    (rows || []).forEach(r => { (out[r.file_id] = out[r.file_id] || []).push(r.person); });
+    res.json(out);
+  });
+});
+
+// Like or unlike a file; answers with the file's new list of persons.
+app.post('/api/like', requireMember, (req, res) => {
+  const { fileId, person, an } = req.body || {};
+  if (typeof fileId !== 'string' || !FILE_ID_RE.test(fileId)) {
+    return res.status(400).json({ error: 'Invalid fileId' });
+  }
+  if (typeof person !== 'string' || !person.trim() || person.length > 100) {
+    return res.status(400).json({ error: 'Invalid person' });
+  }
+  if (typeof an !== 'boolean') return res.status(400).json({ error: 'Invalid an' });
+
+  const wer = person.trim().toLowerCase();
+  const fertig = (err) => {
+    if (err) {
+      console.error('[likes] DB-Fehler:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`[likes] ${wer} ${an ? 'mag' : 'mag nicht mehr'} ${fileId}`);
+    likesFor(fileId, (err2, persons) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      res.json({ fileId, persons });
+    });
+  };
+  if (an) {
+    db.run('INSERT OR IGNORE INTO likes (file_id, person, created) VALUES (?, ?, ?)',
+      [fileId, wer, Date.now()], fertig);
+  } else {
+    db.run('DELETE FROM likes WHERE file_id = ? AND person = ?', [fileId, wer], fertig);
+  }
 });
 
 // Remove subscription (knowing the endpoint is proof enough)
