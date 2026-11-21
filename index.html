@@ -307,6 +307,17 @@
     text-shadow: 0 0 10px rgba(0,0,0,.8);
     pointer-events: none;
   }
+  .kachel .stern {
+    position: absolute; top: 3px; right: 3px;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .92);
+    color: #b8860b;
+    font-size: .7rem; line-height: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+    pointer-events: none;
+  }
   .kachel .wartet {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -457,12 +468,40 @@
     max-width: 640px; width: 100%; max-height: 100%; overflow: auto;
   }
   #overlay video, #overlay img.voll { width: 100%; display: block; background: #000; }
+  /* Leiste unter dem Video: oben die Infozeile, darunter drei
+     Gruppen (Blättern, Behalten, Aktionen). Umgebrochen wird nur
+     zwischen den Gruppen, nie mitten in einer – ‹ und › bleiben
+     immer zusammen. */
   #overlay .leiste {
-    padding: .55rem .7rem;
-    display: flex; gap: .4rem; align-items: center; flex-wrap: wrap;
+    padding: .55rem .7rem .65rem;
+    display: flex; flex-wrap: wrap; align-items: center;
+    column-gap: .75rem; row-gap: .45rem;
     font-size: .8rem;
   }
-  #overlay .leiste .info { color: var(--grau); margin-right: auto; }
+  #overlay .leiste .info {
+    flex: 1 0 100%;
+    color: var(--grau);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  #overlay .leiste .gruppe {
+    display: flex; align-items: center; gap: .35rem;
+    flex: 0 0 auto;
+  }
+  #overlay .leiste .gruppe.aktionen { margin-left: auto; }
+  #overlay .leiste .behalten-knopf {
+    min-width: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--grau);
+  }
+  #overlay .leiste .behalten-knopf svg { display: block; }
+  #overlay .leiste .behalten-knopf[aria-pressed="true"] { color: #b8860b; }
+  #overlay .leiste .behalten {
+    font-size: .76rem;
+    color: var(--grau);
+    white-space: nowrap;
+  }
+  #overlay .leiste .behalten::first-letter { color: #b8860b; }
   #overlay .ladeanzeige { padding: 3rem 1rem; text-align: center; color: var(--grau); }
   #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .85rem; }
   #overlay .ersatz p { color: var(--grau); }
@@ -1980,7 +2019,7 @@ async function laden() {
     await punkteLaden();
 
     kommentare = {};
-    await kommentareVorladen(alleAnker());
+    await Promise.all([kommentareVorladen(alleAnker()), markierungenLaden()]);
     cacheAufraeumen();          // nebenher
 
     el.status.hidden = true;
@@ -2254,6 +2293,9 @@ function kachel(datei, gruppe, index) {
     play.textContent = '▶';
     k.appendChild(play);
   }
+
+  k.dataset.id = datei.id;
+  sternMarke(k, datei.id);
 
   k.onclick = function () { oeffneOverlay(gruppe, index); };
   return k;
@@ -2572,14 +2614,22 @@ function spielLeiste(datei, url) {
           : 'wird archiviert');
   l.appendChild(info);
 
+  function gruppe(name) {
+    const g = document.createElement('div');
+    g.className = 'gruppe ' + name;
+    l.appendChild(g);
+    return g;
+  }
+
   if (gesamt > 1) {
+    const blaettern = gruppe('blaettern');
     const zurueck = document.createElement('button');
     zurueck.className = 'symbol';
     zurueck.textContent = '‹';
     zurueck.title = 'vorheriger Clip';
     zurueck.disabled = wiedergabe.index === 0;
     zurueck.onclick = vorherigerClip;
-    l.appendChild(zurueck);
+    blaettern.appendChild(zurueck);
 
     const weiter = document.createElement('button');
     weiter.className = 'symbol';
@@ -2587,9 +2637,12 @@ function spielLeiste(datei, url) {
     weiter.title = 'nächster Clip';
     weiter.disabled = wiedergabe.index + 1 >= gesamt;
     weiter.onclick = naechsterClip;
-    l.appendChild(weiter);
+    blaettern.appendChild(weiter);
   }
 
+  if (!datei.vorschau) sternKnopf(gruppe('behalten-gruppe'), datei);
+
+  const aktionen = gruppe('aktionen');
   if (!datei.vorschau) {
     const laden = document.createElement('button');
     laden.className = 'leise';
@@ -2600,15 +2653,129 @@ function spielLeiste(datei, url) {
       a.download = datei.name;
       a.click();
     };
-    l.appendChild(laden);
+    aktionen.appendChild(laden);
   }
 
   const zu = document.createElement('button');
   zu.textContent = 'Schließen';
   zu.onclick = schliesseOverlay;
-  l.appendChild(zu);
+  aktionen.appendChild(zu);
 
   return l;
+}
+
+// ============ BEHALTEN-MARKIERUNG ============
+//
+// Mit dem Stern markiert man ein Video zum Behalten: Ist es von
+// mindestens einer Person markiert, bewahrt das Archiv (#6) das
+// Original auf statt nur der kleinen Kopie. Gespeichert wird auf dem
+// Projekt-Server, weil die Markierung die Drive-Datei überleben muss.
+// Wer was markiert hat, bleibt dort – die Seite erfährt nur, ob ein
+// Video überhaupt markiert ist und ob von mir.
+
+let markierungen = {};   // Datei-ID → { markiert, meins }
+
+const STERN_LEER = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.6l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+const STERN_VOLL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.6l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+
+async function markierungenLaden() {
+  const url = localStorage.getItem('tagebuch_server_url');
+  if (!url || !token) return;
+  try {
+    const antwort = await fetch(url + '/api/markierungen?person='
+      + encodeURIComponent(meinName()), {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!antwort.ok) throw new Error('HTTP ' + antwort.status);
+    markierungen = await antwort.json() || {};
+  } catch (e) {
+    console.warn('Markierungen konnten nicht geladen werden:', e);
+    markierungen = {};
+  }
+}
+
+function markStand(id) { return markierungen[id] || { markiert: false, meins: false }; }
+
+/** Kleiner Stern oben rechts auf der Kachel, wenn das Video behalten wird. */
+function sternMarke(k, id) {
+  const alt = k.querySelector('.stern');
+  if (alt) alt.remove();
+  if (!markStand(id).markiert) return;
+  const stern = document.createElement('span');
+  stern.className = 'stern';
+  stern.textContent = '★';
+  stern.setAttribute('aria-label', 'wird behalten');
+  k.appendChild(stern);
+}
+
+function sterneAktualisieren(id) {
+  document.querySelectorAll('.kachel').forEach(function (k) {
+    if (k.dataset.id === id) sternMarke(k, id);
+  });
+}
+
+async function markierungSenden(id, an) {
+  const url = localStorage.getItem('tagebuch_server_url');
+  if (!url) throw new Error('Erst Server-URL in den Einstellungen speichern.');
+  const antwort = await fetch(url + '/api/markierung', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ fileId: id, person: meinName(), an: an })
+  });
+  if (!antwort.ok) throw new Error('Markierung konnte nicht gespeichert werden ('
+                                 + antwort.status + ').');
+  return await antwort.json();
+}
+
+/** Stern-Knopf (nur mein eigener Stand) plus neutrale "wird behalten"-Marke. */
+function sternKnopf(leiste, datei) {
+  const knopf = document.createElement('button');
+  knopf.className = 'leise behalten-knopf';
+  const marke = document.createElement('span');
+  marke.className = 'behalten';
+  marke.textContent = '★ wird behalten';
+
+  function zeige() {
+    const stand = markStand(datei.id);
+    knopf.innerHTML = stand.meins ? STERN_VOLL : STERN_LEER;
+    knopf.setAttribute('aria-pressed', stand.meins ? 'true' : 'false');
+    const text = stand.meins ? 'Markierung entfernen' : 'Behalten markieren';
+    knopf.setAttribute('aria-label', text);
+    knopf.title = text;
+    marke.hidden = !stand.markiert;
+  }
+
+  knopf.onclick = async function () {
+    if (!meinName()) {
+      zeigeFehler('Bitte oben bei "Ich bin" auswählen, wer du bist – '
+                + 'sonst kann die Markierung niemandem zugeordnet werden.');
+      return;
+    }
+    const vorher = markStand(datei.id);
+    const an = !vorher.meins;
+
+    // Sofort anzeigen, bei einem Fehler zurückdrehen. Ob nach dem
+    // Entfernen noch jemand anderes markiert hat, weiß nur der Server.
+    markierungen[datei.id] = { markiert: an || vorher.markiert, meins: an };
+    zeige();
+    sterneAktualisieren(datei.id);
+
+    knopf.disabled = true;
+    try {
+      markierungen[datei.id] = await markierungSenden(datei.id, an);
+    } catch (fehler) {
+      markierungen[datei.id] = vorher;
+      zeigeFehler(fehler.message);
+    } finally {
+      knopf.disabled = false;
+      zeige();
+      sterneAktualisieren(datei.id);
+    }
+  };
+
+  zeige();
+  leiste.appendChild(knopf);
+  leiste.appendChild(marke);
 }
 
 // ============ PUNKTE ============
@@ -4504,6 +4671,7 @@ function fuellePersonen() {
 // Person oder Tag zu wechseln ändert das Tageslimit – neu prüfen.
 el.person.onchange = function () {
   merkePerson();
+  markierungenLaden();   // "meins" hängt davon ab, wer ich bin
   pushSynchronisieren();
   zeichneEntwurf();
   dinoBildAktualisieren();

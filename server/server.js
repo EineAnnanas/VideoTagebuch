@@ -35,6 +35,15 @@ db.serialize(() => {
     status TEXT
   )`);
 
+  // "Behalten"-Markierungen: one row per (file, person). A video marked
+  // by at least one person keeps its original in the archive (#6).
+  db.run(`CREATE TABLE IF NOT EXISTS markierungen (
+    file_id TEXT NOT NULL,
+    person TEXT NOT NULL,
+    created INTEGER NOT NULL,
+    PRIMARY KEY (file_id, person)
+  )`);
+
   db.all('PRAGMA table_info(reminders)', (err, cols) => {
     if (err) return console.error('[db] Migration fehlgeschlagen:', err);
     const vorhanden = new Set(cols.map(c => c.name));
@@ -225,6 +234,71 @@ app.get('/api/archiv/status', requireMember, (req, res) => {
     }
     res.json({ bereit: (rows || []).map(r => r.file_id) });
   });
+});
+
+// ============ MARKIERUNGEN (BEHALTEN) ============
+//
+// Names stay on the server: the browser only learns whether a video is
+// marked to keep at all, and whether the asking person marked it.
+
+const FILE_ID_RE = /^[A-Za-z0-9_-]{1,100}$/;
+
+function validPerson(p) {
+  return typeof p === 'string' && !!p.trim() && p.length <= 100;
+}
+
+function markState(fileId, person, cb) {
+  db.all('SELECT person FROM markierungen WHERE file_id = ?', [fileId], (err, rows) => {
+    if (err) return cb(err);
+    const list = rows || [];
+    cb(null, { markiert: list.length > 0, meins: list.some(r => sameName(r.person, person)) });
+  });
+}
+
+// { fileId: { markiert: true, meins } } for every file marked by anyone
+app.get('/api/markierungen', requireMember, (req, res) => {
+  const person = typeof req.query.person === 'string' ? req.query.person : '';
+  db.all('SELECT file_id, person FROM markierungen', (err, rows) => {
+    if (err) {
+      console.error('[markierung] DB-Fehler:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    const out = {};
+    (rows || []).forEach(r => {
+      const e = out[r.file_id] || (out[r.file_id] = { markiert: true, meins: false });
+      if (person && sameName(r.person, person)) e.meins = true;
+    });
+    res.json(out);
+  });
+});
+
+// Mark or unmark a file; answers with { markiert, meins } for that file.
+app.post('/api/markierung', requireMember, (req, res) => {
+  const { fileId, person, an } = req.body || {};
+  if (typeof fileId !== 'string' || !FILE_ID_RE.test(fileId)) {
+    return res.status(400).json({ error: 'Invalid fileId' });
+  }
+  if (!validPerson(person)) return res.status(400).json({ error: 'Invalid person' });
+  if (typeof an !== 'boolean') return res.status(400).json({ error: 'Invalid an' });
+
+  const wer = person.trim().toLowerCase();
+  const fertig = (err) => {
+    if (err) {
+      console.error('[markierung] DB-Fehler:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`[markierung] ${wer} ${an ? 'markiert' : 'entfernt Markierung'} ${fileId}`);
+    markState(fileId, wer, (err2, state) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      res.json(state);
+    });
+  };
+  if (an) {
+    db.run('INSERT OR IGNORE INTO markierungen (file_id, person, created) VALUES (?, ?, ?)',
+      [fileId, wer, Date.now()], fertig);
+  } else {
+    db.run('DELETE FROM markierungen WHERE file_id = ? AND person = ?', [fileId, wer], fertig);
+  }
 });
 
 // Remove subscription (knowing the endpoint is proof enough)
