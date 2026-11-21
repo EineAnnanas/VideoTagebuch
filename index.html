@@ -307,14 +307,14 @@
     text-shadow: 0 0 10px rgba(0,0,0,.8);
     pointer-events: none;
   }
-  .kachel .herz {
+  .kachel .stern {
     position: absolute; top: 3px; right: 3px;
-    min-width: 18px; height: 18px; padding: 0 4px;
-    display: flex; align-items: center; justify-content: center; gap: 2px;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
     border-radius: 9px;
     background: rgba(255, 255, 255, .92);
-    color: #b3392b;
-    font-size: .62rem; line-height: 1;
+    color: #b8860b;
+    font-size: .7rem; line-height: 1;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
     pointer-events: none;
   }
@@ -474,16 +474,21 @@
     font-size: .8rem;
   }
   #overlay .leiste .info { color: var(--grau); margin-right: auto; }
-  #overlay .leiste .like {
-    display: inline-flex; align-items: center; gap: .3rem;
+  #overlay .leiste .behalten-knopf {
     min-width: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--grau);
   }
-  #overlay .leiste .like .zeichen { font-size: 1rem; line-height: 1; }
-  #overlay .leiste .like[aria-pressed="true"] .zeichen { color: #b3392b; }
-  #overlay .leiste .like-namen {
-    flex-basis: 100%;
-    order: 10;
-    font-size: .75rem; color: var(--grau);
+  #overlay .leiste .behalten-knopf svg { display: block; }
+  #overlay .leiste .behalten-knopf[aria-pressed="true"] { color: #b8860b; }
+  #overlay .leiste .behalten {
+    font-size: .7rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--grau);
+    border: 1px solid var(--rand);
+    border-radius: 999px;
+    padding: .15rem .5rem;
   }
   #overlay .ladeanzeige { padding: 3rem 1rem; text-align: center; color: var(--grau); }
   #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .85rem; }
@@ -2002,7 +2007,7 @@ async function laden() {
     await punkteLaden();
 
     kommentare = {};
-    await Promise.all([kommentareVorladen(alleAnker()), likesLaden()]);
+    await Promise.all([kommentareVorladen(alleAnker()), markierungenLaden()]);
     cacheAufraeumen();          // nebenher
 
     el.status.hidden = true;
@@ -2278,7 +2283,7 @@ function kachel(datei, gruppe, index) {
   }
 
   k.dataset.id = datei.id;
-  herzMarke(k, datei.id);
+  sternMarke(k, datei.id);
 
   k.onclick = function () { oeffneOverlay(gruppe, index); };
   return k;
@@ -2615,7 +2620,7 @@ function spielLeiste(datei, url) {
     l.appendChild(weiter);
   }
 
-  if (!datei.vorschau) likeKnopf(l, datei);
+  if (!datei.vorschau) sternKnopf(l, datei);
 
   if (!datei.vorschau) {
     const laden = document.createElement('button');
@@ -2638,138 +2643,118 @@ function spielLeiste(datei, url) {
   return l;
 }
 
-// ============ LIKES ============
+// ============ BEHALTEN-MARKIERUNG ============
 //
-// Wer ein Video mag, tippt aufs Herz. Ab einem Like ist es ein
-// Highlight: Das Archiv (#6) behält dann das Original. Gespeichert
-// wird auf dem Projekt-Server, weil die Likes die Drive-Datei
-// überleben müssen.
+// Mit dem Stern markiert man ein Video zum Behalten: Ist es von
+// mindestens einer Person markiert, bewahrt das Archiv (#6) das
+// Original auf statt nur der kleinen Kopie. Gespeichert wird auf dem
+// Projekt-Server, weil die Markierung die Drive-Datei überleben muss.
+// Wer was markiert hat, bleibt dort – die Seite erfährt nur, ob ein
+// Video überhaupt markiert ist und ob von mir.
 
-let likes = {};   // Datei-ID → Liste der Namen
+let markierungen = {};   // Datei-ID → { markiert, meins }
 
-async function likesLaden() {
+const STERN_LEER = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.6l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+const STERN_VOLL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.6l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+
+async function markierungenLaden() {
   const url = localStorage.getItem('tagebuch_server_url');
   if (!url || !token) return;
   try {
-    const antwort = await fetch(url + '/api/likes', {
+    const antwort = await fetch(url + '/api/markierungen?person='
+      + encodeURIComponent(meinName()), {
       headers: { Authorization: 'Bearer ' + token }
     });
     if (!antwort.ok) throw new Error('HTTP ' + antwort.status);
-    likes = await antwort.json() || {};
+    markierungen = await antwort.json() || {};
   } catch (e) {
-    console.warn('Likes konnten nicht geladen werden:', e);
-    likes = {};
+    console.warn('Markierungen konnten nicht geladen werden:', e);
+    markierungen = {};
   }
 }
 
-function likesVon(id) { return likes[id] || []; }
+function markStand(id) { return markierungen[id] || { markiert: false, meins: false }; }
 
-function magIch(id) {
-  const ich = meinName().toLowerCase();
-  return !!ich && likesVon(id).some(function (n) { return n.toLowerCase() === ich; });
-}
-
-/** Kleines Herz oben rechts auf der Kachel, sobald jemand das Video mag. */
-function herzMarke(k, id) {
-  const alt = k.querySelector('.herz');
+/** Kleiner Stern oben rechts auf der Kachel, wenn das Video behalten wird. */
+function sternMarke(k, id) {
+  const alt = k.querySelector('.stern');
   if (alt) alt.remove();
-  const anzahl = likesVon(id).length;
-  if (!anzahl) return;
-  const herz = document.createElement('span');
-  herz.className = 'herz';
-  herz.textContent = '♥' + (anzahl > 1 ? ' ' + anzahl : '');
-  herz.setAttribute('aria-label', anzahl === 1 ? '1 Like' : anzahl + ' Likes');
-  k.appendChild(herz);
+  if (!markStand(id).markiert) return;
+  const stern = document.createElement('span');
+  stern.className = 'stern';
+  stern.textContent = '★';
+  stern.setAttribute('aria-label', 'wird behalten');
+  k.appendChild(stern);
 }
 
-function herzenAktualisieren(id) {
+function sterneAktualisieren(id) {
   document.querySelectorAll('.kachel').forEach(function (k) {
-    if (k.dataset.id === id) herzMarke(k, id);
+    if (k.dataset.id === id) sternMarke(k, id);
   });
 }
 
-async function likeSenden(id, an) {
+async function markierungSenden(id, an) {
   const url = localStorage.getItem('tagebuch_server_url');
   if (!url) throw new Error('Erst Server-URL in den Einstellungen speichern.');
-  const antwort = await fetch(url + '/api/like', {
+  const antwort = await fetch(url + '/api/markierung', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
     body: JSON.stringify({ fileId: id, person: meinName(), an: an })
   });
-  if (!antwort.ok) throw new Error('Like konnte nicht gespeichert werden ('
+  if (!antwort.ok) throw new Error('Markierung konnte nicht gespeichert werden ('
                                  + antwort.status + ').');
-  return (await antwort.json()).persons || [];
+  return await antwort.json();
 }
 
-/** Herz-Knopf in der Leiste unter dem Video, mit Liste der Namen. */
-function likeKnopf(leiste, datei) {
+/** Stern-Knopf (nur mein eigener Stand) plus neutrale "wird behalten"-Marke. */
+function sternKnopf(leiste, datei) {
   const knopf = document.createElement('button');
-  knopf.className = 'leise like';
-  const zeichen = document.createElement('span');
-  zeichen.className = 'zeichen';
-  zeichen.setAttribute('aria-hidden', 'true');
-  const zahl = document.createElement('span');
-  knopf.appendChild(zeichen);
-  knopf.appendChild(zahl);
-
-  const namen = document.createElement('div');
-  namen.className = 'like-namen';
-  namen.hidden = true;
+  knopf.className = 'leise behalten-knopf';
+  const marke = document.createElement('span');
+  marke.className = 'behalten';
+  marke.textContent = '★ wird behalten';
 
   function zeige() {
-    const liste = likesVon(datei.id);
-    const an = magIch(datei.id);
-    zeichen.textContent = an ? '♥' : '♡';
-    zahl.textContent = liste.length ? String(liste.length) : '';
-    knopf.setAttribute('aria-pressed', an ? 'true' : 'false');
-    knopf.setAttribute('aria-label', (an ? 'Gefällt mir nicht mehr' : 'Gefällt mir')
-      + (liste.length ? ' (' + liste.length + ')' : ''));
-    knopf.title = liste.length ? 'Gefällt: ' + liste.join(', ') : 'Gefällt mir';
-    namen.textContent = liste.length ? '♥ ' + liste.join(', ') : '';
-    if (!liste.length) namen.hidden = true;
+    const stand = markStand(datei.id);
+    knopf.innerHTML = stand.meins ? STERN_VOLL : STERN_LEER;
+    knopf.setAttribute('aria-pressed', stand.meins ? 'true' : 'false');
+    const text = stand.meins ? 'Markierung entfernen' : 'Behalten markieren';
+    knopf.setAttribute('aria-label', text);
+    knopf.title = text;
+    marke.hidden = !stand.markiert;
   }
 
   knopf.onclick = async function () {
     if (!meinName()) {
       zeigeFehler('Bitte oben bei "Ich bin" auswählen, wer du bist – '
-                + 'sonst weiß niemand, wem das Video gefällt.');
+                + 'sonst kann die Markierung niemandem zugeordnet werden.');
       return;
     }
-    const vorher = likesVon(datei.id).slice();
-    const an = !magIch(datei.id);
-    const ich = meinName().toLowerCase();
+    const vorher = markStand(datei.id);
+    const an = !vorher.meins;
 
-    // Sofort anzeigen, bei einem Fehler zurückdrehen
-    likes[datei.id] = an
-      ? vorher.concat([ich])
-      : vorher.filter(function (n) { return n.toLowerCase() !== ich; });
-    if (likesVon(datei.id).length) namen.hidden = false;
+    // Sofort anzeigen, bei einem Fehler zurückdrehen. Ob nach dem
+    // Entfernen noch jemand anderes markiert hat, weiß nur der Server.
+    markierungen[datei.id] = { markiert: an || vorher.markiert, meins: an };
     zeige();
-    herzenAktualisieren(datei.id);
+    sterneAktualisieren(datei.id);
 
     knopf.disabled = true;
     try {
-      likes[datei.id] = await likeSenden(datei.id, an);
+      markierungen[datei.id] = await markierungSenden(datei.id, an);
     } catch (fehler) {
-      likes[datei.id] = vorher;
+      markierungen[datei.id] = vorher;
       zeigeFehler(fehler.message);
     } finally {
       knopf.disabled = false;
       zeige();
-      herzenAktualisieren(datei.id);
+      sterneAktualisieren(datei.id);
     }
-  };
-
-  // Auf die Zahl tippen klappt die Namen auf, ohne zu liken
-  zahl.onclick = function (e) {
-    if (!likesVon(datei.id).length) return;
-    e.stopPropagation();
-    namen.hidden = !namen.hidden;
   };
 
   zeige();
   leiste.appendChild(knopf);
-  leiste.appendChild(namen);
+  leiste.appendChild(marke);
 }
 
 // ============ PUNKTE ============
@@ -4665,6 +4650,7 @@ function fuellePersonen() {
 // Person oder Tag zu wechseln ändert das Tageslimit – neu prüfen.
 el.person.onchange = function () {
   merkePerson();
+  markierungenLaden();   // "meins" hängt davon ab, wer ich bin
   pushSynchronisieren();
   zeichneEntwurf();
   dinoBildAktualisieren();

@@ -35,9 +35,9 @@ db.serialize(() => {
     status TEXT
   )`);
 
-  // Likes: one row per (file, person). >= 1 like makes a video a
-  // highlight, whose original the archiver keeps (#6).
-  db.run(`CREATE TABLE IF NOT EXISTS likes (
+  // "Behalten"-Markierungen: one row per (file, person). A video marked
+  // by at least one person keeps its original in the archive (#6).
+  db.run(`CREATE TABLE IF NOT EXISTS markierungen (
     file_id TEXT NOT NULL,
     person TEXT NOT NULL,
     created INTEGER NOT NULL,
@@ -236,56 +236,68 @@ app.get('/api/archiv/status', requireMember, (req, res) => {
   });
 });
 
-// ============ LIKES ============
+// ============ MARKIERUNGEN (BEHALTEN) ============
+//
+// Names stay on the server: the browser only learns whether a video is
+// marked to keep at all, and whether the asking person marked it.
 
 const FILE_ID_RE = /^[A-Za-z0-9_-]{1,100}$/;
 
-function likesFor(fileId, cb) {
-  db.all('SELECT person FROM likes WHERE file_id = ? ORDER BY created', [fileId],
-    (err, rows) => cb(err, (rows || []).map(r => r.person)));
+function validPerson(p) {
+  return typeof p === 'string' && !!p.trim() && p.length <= 100;
 }
 
-// All likes as { fileId: [persons] }
-app.get('/api/likes', requireMember, (req, res) => {
-  db.all('SELECT file_id, person FROM likes ORDER BY created', (err, rows) => {
+function markState(fileId, person, cb) {
+  db.all('SELECT person FROM markierungen WHERE file_id = ?', [fileId], (err, rows) => {
+    if (err) return cb(err);
+    const list = rows || [];
+    cb(null, { markiert: list.length > 0, meins: list.some(r => sameName(r.person, person)) });
+  });
+}
+
+// { fileId: { markiert: true, meins } } for every file marked by anyone
+app.get('/api/markierungen', requireMember, (req, res) => {
+  const person = typeof req.query.person === 'string' ? req.query.person : '';
+  db.all('SELECT file_id, person FROM markierungen', (err, rows) => {
     if (err) {
-      console.error('[likes] DB-Fehler:', err);
+      console.error('[markierung] DB-Fehler:', err);
       return res.status(500).json({ error: err.message });
     }
     const out = {};
-    (rows || []).forEach(r => { (out[r.file_id] = out[r.file_id] || []).push(r.person); });
+    (rows || []).forEach(r => {
+      const e = out[r.file_id] || (out[r.file_id] = { markiert: true, meins: false });
+      if (person && sameName(r.person, person)) e.meins = true;
+    });
     res.json(out);
   });
 });
 
-// Like or unlike a file; answers with the file's new list of persons.
-app.post('/api/like', requireMember, (req, res) => {
+// Mark or unmark a file; answers with { markiert, meins } for that file.
+app.post('/api/markierung', requireMember, (req, res) => {
   const { fileId, person, an } = req.body || {};
   if (typeof fileId !== 'string' || !FILE_ID_RE.test(fileId)) {
     return res.status(400).json({ error: 'Invalid fileId' });
   }
-  if (typeof person !== 'string' || !person.trim() || person.length > 100) {
-    return res.status(400).json({ error: 'Invalid person' });
-  }
+  if (!validPerson(person)) return res.status(400).json({ error: 'Invalid person' });
   if (typeof an !== 'boolean') return res.status(400).json({ error: 'Invalid an' });
 
   const wer = person.trim().toLowerCase();
   const fertig = (err) => {
     if (err) {
-      console.error('[likes] DB-Fehler:', err);
+      console.error('[markierung] DB-Fehler:', err);
       return res.status(500).json({ error: err.message });
     }
-    console.log(`[likes] ${wer} ${an ? 'mag' : 'mag nicht mehr'} ${fileId}`);
-    likesFor(fileId, (err2, persons) => {
+    console.log(`[markierung] ${wer} ${an ? 'markiert' : 'entfernt Markierung'} ${fileId}`);
+    markState(fileId, wer, (err2, state) => {
       if (err2) return res.status(500).json({ error: err2.message });
-      res.json({ fileId, persons });
+      res.json(state);
     });
   };
   if (an) {
-    db.run('INSERT OR IGNORE INTO likes (file_id, person, created) VALUES (?, ?, ?)',
+    db.run('INSERT OR IGNORE INTO markierungen (file_id, person, created) VALUES (?, ?, ?)',
       [fileId, wer, Date.now()], fertig);
   } else {
-    db.run('DELETE FROM likes WHERE file_id = ? AND person = ?', [fileId, wer], fertig);
+    db.run('DELETE FROM markierungen WHERE file_id = ? AND person = ?', [fileId, wer], fertig);
   }
 });
 
