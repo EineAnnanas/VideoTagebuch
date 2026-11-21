@@ -105,7 +105,7 @@ self.addEventListener('push', (e) => {
   }
   const title = data.title || 'Video Tagebuch Erinnerung';
   const options = {
-    body: data.body || 'Zeit für deinen täglichen Tagebucheintrag!',
+    body: data.body || 'Neuigkeiten im Video Tagebuch',
     icon: 'assets/icons/favicon-192x192.png',
     badge: 'assets/icons/favicon-96x96.png',
     data: { url: './' }
