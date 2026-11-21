@@ -468,12 +468,27 @@
     max-width: 640px; width: 100%; max-height: 100%; overflow: auto;
   }
   #overlay video, #overlay img.voll { width: 100%; display: block; background: #000; }
+  /* Leiste unter dem Video: oben die Infozeile, darunter drei
+     Gruppen (Blättern, Behalten, Aktionen). Umgebrochen wird nur
+     zwischen den Gruppen, nie mitten in einer – ‹ und › bleiben
+     immer zusammen. */
   #overlay .leiste {
-    padding: .55rem .7rem;
-    display: flex; gap: .4rem; align-items: center; flex-wrap: wrap;
+    padding: .55rem .7rem .65rem;
+    display: flex; flex-wrap: wrap; align-items: center;
+    column-gap: .75rem; row-gap: .45rem;
     font-size: .8rem;
   }
-  #overlay .leiste .info { color: var(--grau); margin-right: auto; }
+  #overlay .leiste .info {
+    flex: 1 0 100%;
+    color: var(--grau);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  #overlay .leiste .gruppe {
+    display: flex; align-items: center; gap: .35rem;
+    flex: 0 0 auto;
+  }
+  #overlay .leiste .gruppe.aktionen { margin-left: auto; }
   #overlay .leiste .behalten-knopf {
     min-width: 36px;
     display: inline-flex; align-items: center; justify-content: center;
@@ -482,14 +497,11 @@
   #overlay .leiste .behalten-knopf svg { display: block; }
   #overlay .leiste .behalten-knopf[aria-pressed="true"] { color: #b8860b; }
   #overlay .leiste .behalten {
-    font-size: .7rem;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: .76rem;
     color: var(--grau);
-    border: 1px solid var(--rand);
-    border-radius: 999px;
-    padding: .15rem .5rem;
+    white-space: nowrap;
   }
+  #overlay .leiste .behalten::first-letter { color: #b8860b; }
   #overlay .ladeanzeige { padding: 3rem 1rem; text-align: center; color: var(--grau); }
   #overlay .ersatz { padding: 1.5rem; text-align: center; font-size: .85rem; }
   #overlay .ersatz p { color: var(--grau); }
@@ -2602,14 +2614,22 @@ function spielLeiste(datei, url) {
           : 'wird archiviert');
   l.appendChild(info);
 
+  function gruppe(name) {
+    const g = document.createElement('div');
+    g.className = 'gruppe ' + name;
+    l.appendChild(g);
+    return g;
+  }
+
   if (gesamt > 1) {
+    const blaettern = gruppe('blaettern');
     const zurueck = document.createElement('button');
     zurueck.className = 'symbol';
     zurueck.textContent = '‹';
     zurueck.title = 'vorheriger Clip';
     zurueck.disabled = wiedergabe.index === 0;
     zurueck.onclick = vorherigerClip;
-    l.appendChild(zurueck);
+    blaettern.appendChild(zurueck);
 
     const weiter = document.createElement('button');
     weiter.className = 'symbol';
@@ -2617,11 +2637,12 @@ function spielLeiste(datei, url) {
     weiter.title = 'nächster Clip';
     weiter.disabled = wiedergabe.index + 1 >= gesamt;
     weiter.onclick = naechsterClip;
-    l.appendChild(weiter);
+    blaettern.appendChild(weiter);
   }
 
-  if (!datei.vorschau) sternKnopf(l, datei);
+  if (!datei.vorschau) sternKnopf(gruppe('behalten-gruppe'), datei);
 
+  const aktionen = gruppe('aktionen');
   if (!datei.vorschau) {
     const laden = document.createElement('button');
     laden.className = 'leise';
@@ -2632,13 +2653,13 @@ function spielLeiste(datei, url) {
       a.download = datei.name;
       a.click();
     };
-    l.appendChild(laden);
+    aktionen.appendChild(laden);
   }
 
   const zu = document.createElement('button');
   zu.textContent = 'Schließen';
   zu.onclick = schliesseOverlay;
-  l.appendChild(zu);
+  aktionen.appendChild(zu);
 
   return l;
 }
