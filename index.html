@@ -1175,7 +1175,7 @@ async function loadServerConfig() {
     const serverConfig = await res.json();
 
     // Fill your existing CONFIG object with the data from the Raspberry Pi
-    konfigUebernehmen(serverConfig);
+    configUebernehmen(serverConfig);
     try {
       localStorage.setItem(KONFIG_SPEICHER, JSON.stringify({ url: serverUrl, daten: serverConfig }));
     } catch (e) {}
@@ -1198,7 +1198,7 @@ function mitZeitlimit(url, optionen, ms) {
     .finally(function () { clearTimeout(timer); });
 }
 
-function konfigUebernehmen(serverConfig) {
+function configUebernehmen(serverConfig) {
   CONFIG.REIHENFOLGE = serverConfig.reihenfolge || [];
   CONFIG.ZYKLUS_START = serverConfig.zyklus_start || '';
   CONFIG.KONTEN_HASHES = serverConfig.konten_hashes || [];
@@ -1207,8 +1207,8 @@ function konfigUebernehmen(serverConfig) {
 
 const KONFIG_SPEICHER = 'tagebuch_server_config';
 
-/** Die zuletzt geladene Konfiguration – nur, wenn sie zur Server-URL passt. */
-function gemerkteKonfig() {
+/** Die zuletzt geladene Config – nur, wenn sie zur Server-URL passt. */
+function gemerkteConfig() {
   try {
     const roh = JSON.parse(localStorage.getItem(KONFIG_SPEICHER));
     const url = localStorage.getItem('tagebuch_server_url');
@@ -1217,16 +1217,16 @@ function gemerkteKonfig() {
 }
 
 /**
- * Liegt eine Konfiguration vom letzten Mal vor, gilt sie sofort und
+ * Liegt eine Config vom letzten Mal vor, gilt sie sofort und
  * die frische kommt nebenher. Sonst wird auf den Server gewartet.
  */
 let serverConfigPromise = null;
 function ensureServerConfig() {
   if (!serverConfigPromise) {
-    const gemerkt = gemerkteKonfig();
+    const gemerkt = gemerkteConfig();
     const frisch = loadServerConfig();
     if (gemerkt) {
-      konfigUebernehmen(gemerkt);
+      configUebernehmen(gemerkt);
       serverConfigPromise = Promise.resolve(true);
     } else {
       serverConfigPromise = frisch;
@@ -2136,7 +2136,7 @@ function zwischenstandZeigen() {
   if (!konto || stand.konto !== konto) return;
   if (token) return;   // schon angemeldet – laden() ist dran
 
-  ensureServerConfig();   // übernimmt die gemerkte Konfiguration sofort
+  ensureServerConfig();   // übernimmt die gemerkte Config sofort
   if (!CONFIG.REIHENFOLGE || !CONFIG.REIHENFOLGE.length) return;
 
   unterordner = stand.unterordner || [];
