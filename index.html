@@ -102,7 +102,8 @@
     button:hover:not(:disabled) { background: #f3f1e9; border-color: var(--blass); }
   }
   button:active:not(:disabled) { background: #eae7db; }
-  button:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+  button:focus-visible,
+  select:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
   button:disabled { opacity: .35; cursor: default; }
 
   button.wichtig {
@@ -136,7 +137,7 @@
   /* ---- Hochladen ---- */
   #hochladen-bereich {
     border: 1px solid var(--rand);
-    border-radius: 4px;
+    border-radius: 6px;
     background: var(--flaeche);
     padding: .7rem;
     margin-bottom: 1.25rem;
@@ -146,8 +147,11 @@
     flex-wrap: wrap;
   }
   #hochladen-bereich label { font-size: .8rem; color: var(--grau); }
-  #hochladen-status { font-size: .8rem; color: var(--grau); }
+  #spielknopf { margin-left: auto; }
+  #hochladen-status { order: 10; flex-basis: 100%; font-size: .8rem; color: var(--grau); }
+  #hochladen-status:empty { display: none; }
   #balken {
+    order: 11;
     flex-basis: 100%;
     height: 4px;
     background: var(--platz);
@@ -159,7 +163,7 @@
   /* ---- Spiel ---- */
   #spiel {
     border: 1px solid var(--rand);
-    border-radius: 4px;
+    border-radius: 6px;
     background: var(--papier);
     margin-top: .6rem;
     overflow: hidden;
@@ -207,7 +211,7 @@
   /* ---- Zusammenstellen vor dem Hochladen ---- */
   #composer {
     border: 1px solid var(--text);
-    border-radius: 4px;
+    border-radius: 6px;
     background: var(--flaeche);
     padding: .8rem;
     margin-bottom: 1.25rem;
@@ -227,13 +231,13 @@
     align-items: center;
     gap: .55rem;
     border: 1px solid var(--rand);
-    border-radius: 3px;
+    border-radius: 4px;
     padding: .35rem;
   }
   .eintrag .nr { font-size: .78rem; color: var(--grau); width: 1.1rem; text-align: center; flex: 0 0 auto; }
   .eintrag .mini {
     width: 50px; height: 50px; flex: 0 0 50px;
-    background: var(--platz); border-radius: 2px; overflow: hidden;
+    background: var(--platz); border-radius: 3px; overflow: hidden;
   }
   .eintrag .mini img, .eintrag .mini video {
     width: 100%; height: 100%; object-fit: cover; display: block;
@@ -294,7 +298,7 @@
     max-width: 108px;
     aspect-ratio: 3 / 4;
     background: var(--platz);
-    border-radius: 3px;
+    border-radius: 4px;
     overflow: hidden;
     position: relative;
     cursor: pointer;
@@ -320,26 +324,30 @@
   }
   .kachel .wartet {
     position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: .65rem; color: var(--grau); text-align: center; padding: .2rem;
+    display: flex; align-items: flex-end; justify-content: center;
+    font-size: .65rem; line-height: 1.3; color: var(--grau); text-align: center;
+    padding: .2rem .2rem .55rem;
   }
 
+  /* Fehlendes Video: gestrichelter Platzhalter. Pause: kein Rahmen,
+     nur ein ruhiges Feld – es fehlt ja nichts. */
   .keins {
     border: 1px dashed var(--blass);
-    border-radius: 3px;
+    border-radius: 4px;
     padding: .8rem;
     font-size: .8rem;
-    color: var(--blass);
+    color: var(--grau);
   }
   .pausenfeld {
-    border: 1px dotted var(--blass);
-    border-radius: 3px;
+    border: 1px solid transparent;
+    background: rgba(230, 226, 213, .45);
+    border-radius: 4px;
     padding: .8rem;
     font-size: .8rem;
     color: var(--grau);
   }
 
-  .extraknopf { margin-top: .55rem; font-size: .78rem; }
+  .extraknopf { margin-top: .55rem; margin-left: -.85rem; font-size: .78rem; }
   .extras { margin-top: .5rem; }
   .extras .wer { font-size: .8rem; font-family: system-ui, sans-serif; color: var(--grau); }
 
@@ -367,6 +375,11 @@
     margin-top: .3rem;
   }
   .tagspalte .kachel { max-width: none; }
+  /* Pause im Wochenraster so hoch wie eine Kachel, damit die Reihe ruhig bleibt */
+  .tagspalte .pausenfeld {
+    aspect-ratio: 3 / 4;
+    display: flex; align-items: center; justify-content: center;
+  }
 
   #wochenleiste { display: flex; align-items: center; gap: .4rem; margin-bottom: .8rem; }
   #wochentitel { font-family: var(--serif); font-size: 1.05rem; margin: 0 .4rem; }
@@ -382,10 +395,10 @@
   #zahlen .kennzahl .titel { font-size: .7rem; color: var(--grau); }
   #zahlen .kennzahl .wert { font-family: var(--serif); font-size: 1.25rem; }
 
-  #raster { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  #raster { border-collapse: collapse; font-size: .78rem; }
   #raster td { padding: .18rem 0; }
   #raster td.person { color: var(--grau); width: 6.5rem; }
-  #raster td.punkt { text-align: center; }
+  #raster td.punkt { text-align: center; width: 1.9rem; }
   #raster .da { color: var(--text); }
   #raster .fehlt { color: var(--blass); }
   #raster .legende { font-size: .72rem; color: var(--grau); padding-top: .6rem; }
@@ -464,7 +477,7 @@
   }
   #overlay-inhalt {
     background: var(--flaeche);
-    border-radius: 4px;
+    border-radius: 6px;
     max-width: 640px; width: 100%; max-height: 100%; overflow: auto;
   }
   #overlay video, #overlay img.voll { width: 100%; display: block; background: #000; }
@@ -533,7 +546,7 @@
     gap: .45rem;
   }
   .kommentar .autor { font-weight: 600; font-size: .82rem; }
-  .kommentar .wann { font-size: .72rem; color: var(--blass); }
+  .kommentar .wann { font-size: .72rem; color: var(--grau); }
   .kommentar .loeschen {
     margin-left: auto;
     padding: .1rem .35rem;
@@ -556,7 +569,7 @@
     color: var(--text);
     resize: vertical;
   }
-  .kommentarform textarea::placeholder { color: var(--blass); }
+  .kommentarform textarea::placeholder { color: var(--grau); opacity: .8; }
   .kommentarform textarea:focus-visible {
     outline: 2px solid var(--text);
     outline-offset: 1px;
@@ -575,13 +588,15 @@
   body.handy .datumspalte .zahl { font-size: 1.4rem; }
 
   @media (max-width: 560px) {
+    /* Die Handy-Vorschau ergibt nur am großen Bildschirm Sinn */
+    body:not(.handy) #handyknopf { display: none; }
     .datumspalte { flex: 0 0 52px; }
     .datumspalte .zahl { font-size: 1.4rem; }
     .tagzeile { gap: .7rem; }
   }
 
   #aufgeraeumt { font-size: .8rem; color: var(--grau); margin: 0 0 1rem; }
-  #konto { font-size: .75rem; color: var(--blass); }
+  #konto { font-size: .75rem; color: var(--grau); }
   #konto.falsch { color: #8c2f22; }
   #status { color: var(--grau); }
   #fehler {
@@ -590,11 +605,15 @@
     font-size: .82rem;
     border: 1px solid #d8b9b1;
     background: #fbf3f1;
-    padding: .7rem;
-    border-radius: 3px;
+    padding: .7rem .8rem;
+    border-radius: 6px;
     margin-bottom: 1rem;
   }
   [hidden] { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+  }
   /* ---- Einstellungen ---- */
 
   /* Zahnrad oben rechts im Kopf, als eigener Bereich neben
@@ -917,6 +936,494 @@
     border: 1px solid #d8b9b1;
     color: #8c2f22;
   }
+
+  /* ================================================================
+     MODERNISIERUNG
+     Gleiche Farben und Schriften, neue Anordnung:
+     – Kopf klebt oben, halbdurchsichtig.
+     – Die Heute-Karte ist das eine große Element der Seite.
+     – Die Zeitleiste hängt an einer durchgehenden Linie ("Rücken"
+       des Tagebuchs), jeder Tag ist ein Punkt darauf.
+     – Am Handy wandern die Aktionen in eine Leiste am unteren Rand.
+     Abstände in Schritten von .25rem, Radien nach Rolle:
+     Bedienelemente 8 px, Bilder 10 px, Karten 16 px.
+     ================================================================ */
+
+  :root {
+    --schatten-karte: 0 1px 0 rgba(44, 43, 38, .04), 0 14px 34px -22px rgba(44, 43, 38, .28);
+    --glas: rgba(250, 249, 245, .84);
+    --gold: #b8860b;
+  }
+
+  body { padding-top: 0; }
+  button, select { border-radius: 8px; }
+
+  /* ---- Kopf: klebt oben, Inhalt scheint leicht durch ---- */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    align-items: center;
+    margin: 0 -1rem 1.5rem;
+    padding: calc(.7rem + env(safe-area-inset-top, 0px)) 1rem .7rem;
+    border-bottom: 1px solid var(--rand);
+    isolation: isolate;
+  }
+  /* Der Glas-Hintergrund liegt auf einer eigenen Ebene: ein
+     backdrop-filter direkt am Kopf würde die feste Leiste unten
+     (am Handy) an den Kopf binden statt an den Bildschirm. */
+  header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--glas);
+    -webkit-backdrop-filter: saturate(1.3) blur(14px);
+    backdrop-filter: saturate(1.3) blur(14px);
+  }
+  .kopf-inhalt { align-items: center; gap: .5rem; }
+  h1 { font-size: 1.4rem; letter-spacing: -.01em; }
+  .kopf-aktionen { display: flex; align-items: center; gap: .1rem; }
+  #btn-open-settings::before { content: none; }
+
+  /* Symbole für die Aktionen (als Maske, damit sie die Textfarbe
+     übernehmen und JS den Beschriftungstext frei setzen kann) */
+  .kopf-aktionen button::before {
+    content: "";
+    display: none;
+    width: 20px;
+    height: 20px;
+    background: currentColor;
+    -webkit-mask: var(--symbol) center / contain no-repeat;
+    mask: var(--symbol) center / contain no-repeat;
+  }
+  #neuladen { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 11a8 8 0 1 0-2.3 5.7'/%3E%3Cpath d='M20 4v7h-7'/%3E%3C/svg%3E"); }
+  #listenknopf { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z'/%3E%3Cpath d='M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3'/%3E%3C/svg%3E"); }
+  #wechseln { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21a8 8 0 0 1 16 0'/%3E%3C/svg%3E"); }
+  #ansicht { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E"); }
+
+  /* ---- Heute-Karte: das eine große Element ---- */
+  #heute-karte {
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 16px;
+    padding: 1.25rem 1.25rem 1rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--schatten-karte);
+  }
+  /* Ohne Anmeldung keine Heute-Karte (Klasse statt :has, damit es überall geht) */
+  body:not(.angemeldet) #heute-karte { display: none; }
+  #heute-karte:has(> #hochladen-bereich[hidden]) { display: none; }
+  #heute-kopf {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 1.1rem;
+    align-items: end;
+    margin-bottom: 1.1rem;
+  }
+  #heute-kopf:empty { display: none; }
+  .heute-zahl {
+    grid-row: 1 / span 3;
+    align-self: center;
+    font-family: var(--serif);
+    font-size: 4.2rem;
+    line-height: .85;
+    letter-spacing: -.03em;
+    font-variant-numeric: lining-nums;
+  }
+  .heute-datum { font-size: .8rem; color: var(--grau); }
+  .heute-satz { font-family: var(--serif); font-size: 1.45rem; line-height: 1.2; margin: .1rem 0 .2rem; }
+  .heute-stand {
+    font-size: .84rem;
+    color: var(--grau);
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+  }
+  .heute-stand::before {
+    content: "";
+    width: 8px; height: 8px; border-radius: 50%;
+    border: 1.5px solid var(--grau);
+    flex: 0 0 auto;
+  }
+  #heute-kopf.erledigt .heute-stand { color: var(--text); }
+  #heute-kopf.erledigt .heute-stand::before { background: var(--text); border-color: var(--text); }
+
+  #hochladen-bereich {
+    border: 0;
+    border-top: 1px solid var(--rand);
+    border-radius: 0;
+    background: none;
+    padding: 1rem 0 0;
+    margin: 0;
+    gap: .5rem .6rem;
+  }
+  #heute-kopf:empty + #hochladen-bereich { border-top: 0; padding-top: 0; }
+  #waehlen { min-height: 44px; padding-inline: 1.15rem; border-radius: 10px; font-size: .9rem; }
+  #balken { height: 6px; border-radius: 3px; }
+
+  /* ---- Zeitleiste am Rücken ---- */
+  .tagzeile { border-top: 0; padding: 0; gap: .9rem; }
+  .tagzeile:first-child { padding-top: 0; }
+  .datumspalte { flex-basis: 64px; padding-top: .05rem; }
+  .datumspalte .zahl { font-size: 1.9rem; line-height: 1; }
+  .datumspalte .heute {
+    border: 0;
+    background: var(--text);
+    color: var(--papier);
+    padding: .05rem .45rem;
+    margin-top: .35rem;
+  }
+
+  .tagzeile > .inhalt {
+    position: relative;
+    border-left: 1px solid var(--rand);
+    padding: .2rem 0 1.9rem 1.25rem;
+  }
+  .tagzeile:last-child > .inhalt { padding-bottom: .5rem; }
+  /* Punkt auf dem Rücken: gefüllt = Video da, hohl = nichts */
+  .tagzeile > .inhalt::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: .7rem;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--text);
+    box-shadow: 0 0 0 4px var(--papier);
+  }
+  .tagzeile.leerlauf > .inhalt::before { background: var(--papier); border: 1.5px solid var(--blass); }
+  /* Heute: Ring statt Punkt, eng genug, dass er die Zahl nicht berührt */
+  .tagzeile.ist-heute > .inhalt::before {
+    background: var(--papier);
+    border: 2px solid var(--text);
+    box-shadow: 0 0 0 3px var(--papier);
+  }
+
+  .tagzeile .wer { font-size: 1.15rem; margin-bottom: .6rem; }
+  .tagzeile .wer span { margin-left: .3rem; }
+
+  /* Clips: größere Bilder; bei vielen scrollt die Reihe seitlich */
+  .clips {
+    gap: .5rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: 2px 2px 4px;
+    margin: -2px -2px -4px;
+  }
+  .clips::-webkit-scrollbar { display: none; }
+  .kachel {
+    flex: 0 0 auto;
+    width: 136px;
+    max-width: none;
+    border-radius: 10px;
+    scroll-snap-align: start;
+    box-shadow: 0 1px 2px rgba(44, 43, 38, .14);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  @media (hover: hover) {
+    .kachel:hover { transform: translateY(-2px); box-shadow: 0 8px 18px -10px rgba(44, 43, 38, .45); }
+  }
+  .kachel:active { transform: scale(.97); }
+  /* Abspiel-Zeichen klein unten links statt mitten über dem Bild */
+  .kachel .play {
+    inset: auto auto .45rem .45rem;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(20, 19, 17, .55);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    text-shadow: none;
+  }
+  .kachel .play svg { margin-left: 2px; }
+  .kachel .stern { top: .4rem; right: .4rem; width: 22px; height: 22px; border-radius: 11px; font-size: .78rem; }
+  .kachel .wartet { align-items: center; padding: .5rem; }
+
+  .keins, .pausenfeld { border-radius: 10px; padding: .85rem 1rem; }
+  .extraknopf { margin-left: -.85rem; }
+
+  /* ---- Kommentare als Sprechblasen ---- */
+  .kommentare { margin-top: .9rem; }
+  .kommentarliste { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; }
+  .kommentar {
+    max-width: min(92%, 480px);
+    margin: 0;
+    padding: .45rem .75rem .5rem;
+    border: 1px solid var(--rand);
+    border-radius: 14px 14px 14px 4px;
+    background: var(--flaeche);
+  }
+  /* Eigene Kommentare (nur die haben "löschen") rechts und getönt */
+  .kommentar:has(.loeschen) {
+    align-self: flex-end;
+    border-radius: 14px 14px 4px 14px;
+    background: #f1eee4;
+    border-color: transparent;
+  }
+  .kommentar .kopf { gap: .4rem; }
+  .kommentar .loeschen { margin-right: -.4rem; }
+  .kommentarform textarea { border-radius: 10px; max-width: none; }
+  .kommentarform { max-width: 560px; }
+
+  /* ---- Wochenraster ---- */
+  .tagspalte .kachel { width: auto; }
+  .tagspalte.heute .tagkopf { border-bottom-width: 2px; }
+
+  /* ---- Übersicht als Kacheln ---- */
+  #uebersicht { border-top: 0; margin-top: 1.5rem; padding-top: 0; }
+  #zahlen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .6rem;
+    margin-bottom: .75rem;
+  }
+  #zahlen .kennzahl {
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 16px;
+    padding: .8rem .95rem .85rem;
+  }
+  #zahlen .kennzahl .titel { font-size: .75rem; }
+  #zahlen .kennzahl .wert { font-size: 1.6rem; line-height: 1.15; margin-top: .15rem; }
+  #raster {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 16px;
+    padding: .7rem 1rem;
+  }
+
+  /* ---- Fuß mit Konto ---- */
+  #fuss {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-top: 2.5rem;
+    padding-top: .9rem;
+    border-top: 1px solid var(--rand);
+  }
+  #fuss #handyknopf { margin-right: -.85rem; font-size: .78rem; }
+
+  /* ---- Dialoge: weicher Hintergrund, runde Karten ---- */
+  #overlay, #listen {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  #overlay-inhalt, #listen-inhalt { border-radius: 16px; }
+  /* Über Kopf (30) und Handy-Leiste (40), unter den Einstellungen (100) */
+  #overlay, #listen { z-index: 70; }
+  #fehler { border-radius: 12px; }
+
+  /* ---- Handy ---- */
+  @media (max-width: 560px) {
+    body { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
+    header { margin-bottom: 1.1rem; }
+    h1 { font-size: 1.3rem; }
+
+    /* Aktionen als Leiste unten, mit Symbol über der Beschriftung */
+    .kopf-aktionen {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 40;
+      justify-content: space-around;
+      gap: 0;
+      padding: .3rem .5rem calc(.3rem + env(safe-area-inset-bottom, 0px));
+      background: rgba(255, 254, 251, .9);
+      -webkit-backdrop-filter: saturate(1.3) blur(14px);
+      backdrop-filter: saturate(1.3) blur(14px);
+      border-top: 1px solid var(--rand);
+    }
+    body:not(.angemeldet) .kopf-aktionen { display: none; }
+    .kopf-aktionen button {
+      flex: 1 1 0;
+      flex-direction: column;
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+      min-height: 52px;
+      padding: .35rem .15rem;
+      font-size: .68rem;
+      white-space: nowrap;
+      color: var(--grau);
+    }
+    .kopf-aktionen button[hidden] { display: none; }
+    .kopf-aktionen button::before { display: block; }
+
+    #heute-karte { padding: 1.1rem 1rem .95rem; margin-bottom: 1.6rem; }
+    .heute-zahl { font-size: 3.5rem; }
+    .heute-satz { font-size: 1.25rem; }
+    #waehlen { flex: 1 1 100%; order: 5; }
+    #spielknopf { order: 6; margin: 0 auto; }
+
+    .datumspalte { flex-basis: 40px; }
+    .datumspalte .zahl { font-size: 1.55rem; }
+    .datumspalte .monat { font-size: .68rem; }
+    .tagzeile { gap: .6rem; }
+    .tagzeile > .inhalt { padding-left: 1rem; }
+    /* Zweieinhalb Bilder sichtbar: man sieht, dass es weitergeht */
+    .kachel { width: calc((100% - 1rem) / 2.35); }
+
+    #zahlen { gap: .45rem; }
+    #zahlen .kennzahl { padding: .7rem .75rem; border-radius: 14px; }
+    #zahlen .kennzahl .wert { font-size: 1.3rem; }
+    #fuss { flex-wrap: wrap; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kachel, .kachel:hover, .kachel:active { transition: none; transform: none; }
+  }
+
+  /* ---- Begrüßung ---- */
+  #willkommen {
+    text-align: center;
+    padding: 3.5rem 1.25rem 3rem;
+    margin: 1rem auto 2rem;
+    max-width: 460px;
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(44, 43, 38, .04), 0 8px 24px rgba(44, 43, 38, .05);
+  }
+  body.angemeldet #willkommen { display: none; }
+  body:not(.angemeldet) #status,
+  body:not(.angemeldet) #fuss { display: none; }
+  #willkommen h2 {
+    font-family: var(--serif);
+    font-weight: normal;
+    font-size: 2rem;
+    margin: 0 0 .6rem;
+  }
+  #willkommen p {
+    color: var(--grau);
+    font-size: .92rem;
+    line-height: 1.5;
+    margin: 0 auto 1.6rem;
+    max-width: 34ch;
+    text-wrap: balance;
+  }
+  #willkommen #anmelden {
+    font-size: .95rem;
+    padding: .85rem 1.6rem;
+    border-radius: 10px;
+    min-height: 48px;
+  }
+
+  /* ---- Hinweiskarten ---- */
+  .hinweis {
+    display: flex;
+    align-items: flex-start;
+    gap: .65rem;
+    padding: .8rem .6rem .8rem .9rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    font-size: .84rem;
+    line-height: 1.45;
+    border: 1px solid var(--rand);
+    background: var(--flaeche);
+    color: var(--text);
+  }
+  .hinweis .hinweis-symbol { flex: 0 0 auto; margin-top: .05rem; }
+  .hinweis .hinweis-text { flex: 1; white-space: pre-wrap; padding-top: .05rem; }
+  .hinweis .hinweis-zu {
+    flex: 0 0 auto;
+    min-width: 32px; min-height: 32px;
+    margin: -.4rem -.1rem -.4rem 0;
+    font-size: 1.1rem;
+    color: inherit;
+    opacity: .6;
+  }
+  .hinweis .hinweis-zu:hover { opacity: 1; }
+  #fehler.hinweis-fehler {
+    color: #8c2f22;
+    background: #fbf3f1;
+    border-color: #d8b9b1;
+    padding: .8rem .6rem .8rem .9rem;
+    font-size: .84rem;
+  }
+  #aufgeraeumt.hinweis-info { color: var(--grau); margin: 0 0 1rem; font-size: .84rem; }
+  #aufgeraeumt.hinweis-info .hinweis-symbol { color: #6f8a5a; }
+  /* Infos blenden nach ein paar Sekunden von selbst aus */
+  #aufgeraeumt { transition: opacity .4s ease; }
+  #aufgeraeumt.verblasst { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    #aufgeraeumt { transition: none; }
+  }
+
+  /* ---- Bestenliste: Tabs, Podest, Balken ---- */
+  #punkte { display: block; }
+  .listen-tabs {
+    display: flex;
+    gap: .25rem;
+    padding: .25rem;
+    background: var(--platz);
+    border-radius: 10px;
+    margin-bottom: 1.2rem;
+  }
+  .listen-tab {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    border-radius: 8px;
+    min-height: 36px;
+    color: var(--grau);
+    font-size: .85rem;
+  }
+  .listen-tab[aria-selected="true"] {
+    background: var(--flaeche);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(44, 43, 38, .12);
+  }
+  .bestenliste h3 { border-bottom: 0; color: var(--grau); font-family: inherit; font-size: .75rem; letter-spacing: .02em; margin-bottom: .6rem; }
+  .podest {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .5rem;
+    margin-bottom: .6rem;
+  }
+  .podest-platz {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .15rem;
+    padding: .8rem .4rem .7rem;
+    border: 1px solid var(--rand);
+    border-radius: 12px;
+    background: var(--papier);
+    font: inherit;
+    color: inherit;
+    min-height: 0;
+    text-align: center;
+  }
+  button.podest-platz { cursor: pointer; }
+  .podest-platz.platz-1 { background: var(--flaeche); border-color: #d9c79a; box-shadow: 0 4px 14px rgba(184, 134, 11, .10); }
+  .podest-rang { font-size: .72rem; color: var(--grau); }
+  .platz-1 .podest-rang { color: #b8860b; }
+  .podest-wert { font-family: var(--serif); font-size: 1.6rem; line-height: 1.1; }
+  .platz-1 .podest-wert { font-size: 1.9rem; }
+  .podest-name { font-size: .8rem; color: var(--grau); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .podest-platz.ich .podest-name { color: var(--text); font-weight: 600; }
+  .podest-detail { font-size: .72rem; color: var(--grau); margin: 0 0 .8rem; line-height: 1.45; }
+  .bestenliste .wer { padding-right: .8rem; width: 100%; }
+  .bestenliste .platz { min-width: 2rem; white-space: nowrap; }
+  #listen-inhalt { max-width: 520px; }
+  .balken-anteil {
+    display: block;
+    height: 3px;
+    margin-top: .3rem;
+    background: var(--platz);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .balken-anteil > span { display: block; height: 100%; background: var(--grau); border-radius: 2px; }
+  .bestenliste tr.ich .balken-anteil > span { background: var(--text); }
+  .bestenliste tr:first-child .wert { font-size: 1rem; }
+  .bestenliste td { padding: .4rem 0; vertical-align: top; }
 </style>
 </head>
 <body>
@@ -924,13 +1431,13 @@
 <header>
   <div class="kopf-inhalt">
     <h1>Videotagebuch</h1>
-    <button id="anmelden" class="wichtig">Mit Google anmelden</button>
-    <button id="ansicht" class="leise" hidden>Wochenraster</button>
-    <button id="neuladen" class="leise" hidden>Neu laden</button>
-    <button id="listenknopf" class="leise" hidden>Bestenliste</button>
-    <button id="wechseln" class="leise" hidden>Konto wechseln</button>
-    <button id="handyknopf" class="leise">Handy-Ansicht</button>
-    <span id="konto"></span>
+    <!-- Am Handy wird diese Gruppe zur Leiste am unteren Rand -->
+    <nav class="kopf-aktionen" aria-label="Aktionen">
+      <button id="ansicht" class="leise" hidden>Wochenraster</button>
+      <button id="neuladen" class="leise" hidden>Neu laden</button>
+      <button id="listenknopf" class="leise" hidden>Bestenliste</button>
+      <button id="wechseln" class="leise" hidden>Konto wechseln</button>
+    </nav>
   </div>
   <button id="btn-open-settings" title="Einstellungen" aria-label="Einstellungen" aria-haspopup="dialog" aria-controls="settings-backdrop">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -940,6 +1447,11 @@
   </button>
 </header>
 
+<!-- Die Karte für heute: wer dran ist, ob schon etwas da ist, und
+     direkt darunter das Hochladen. Ohne Anmeldung unsichtbar, weil
+     dann auch der Hochladebereich versteckt ist. -->
+<section id="heute-karte" aria-label="Heute">
+<div id="heute-kopf"></div>
 <div id="hochladen-bereich" hidden>
   <label for="person">Ich bin</label>
   <select id="person"></select>
@@ -955,6 +1467,7 @@
   <button id="spielknopf" class="leise">Spielen</button>
   <div id="balken" hidden><div></div></div>
 </div>
+</section>
 
 <section id="spiel" hidden>
   <div class="spielkopf">
@@ -979,8 +1492,24 @@
   </div>
 </section>
 
-<div id="fehler" hidden></div>
-<p id="aufgeraeumt" hidden></p>
+<!-- Begrüßung, solange niemand angemeldet ist -->
+<section id="willkommen" aria-labelledby="willkommen-titel">
+  <h2 id="willkommen-titel">Willkommen</h2>
+  <p>Euer gemeinsames Video-Tagebuch. Melde dich mit deinem Projektkonto an.</p>
+  <button id="anmelden" class="wichtig">Mit Google anmelden</button>
+</section>
+
+<!-- Hinweise als Karten; der Text kommt in .hinweis-text -->
+<div id="fehler" class="hinweis hinweis-fehler" role="alert" hidden>
+  <svg class="hinweis-symbol" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></svg>
+  <span class="hinweis-text"></span>
+  <button class="hinweis-zu leise symbol" aria-label="Hinweis schließen" title="Schließen">&times;</button>
+</div>
+<div id="aufgeraeumt" class="hinweis hinweis-info" role="status" hidden>
+  <svg class="hinweis-symbol" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-4.8"/></svg>
+  <span class="hinweis-text"></span>
+  <button class="hinweis-zu leise symbol" aria-label="Hinweis schließen" title="Schließen">&times;</button>
+</div>
 <p id="status">Nicht angemeldet.</p>
 
 <nav id="wochenleiste" hidden>
@@ -998,6 +1527,11 @@
   <div id="zahlen"></div>
   <table id="raster"></table>
 </section>
+
+<footer id="fuss">
+  <span id="konto"></span>
+  <button id="handyknopf" class="leise">Handy-Ansicht</button>
+</footer>
 
 <div id="listen" hidden>
   <div id="listen-inhalt">
@@ -1756,6 +2290,8 @@ function gemerktesKonto() {
 }
 
 async function angemeldet() {
+  // Steuert per CSS Begrüßung, Heute-Karte und Handy-Leiste
+  document.body.classList.add('angemeldet');
   await ensureServerConfig();
   el.anmelden.hidden = true;
   el.neuladen.hidden = false;
@@ -2094,10 +2630,10 @@ async function aufraeumen() {
     dateien = dateien.filter(function (d) {
       return geloescht.indexOf(d.id) === -1;
     });
-    el.aufgeraeumt.textContent = geloescht.length === 1
+    hinweisText(el.aufgeraeumt).textContent = geloescht.length === 1
       ? 'Ein abgelaufenes Video wurde gelöscht.'
       : geloescht.length + ' abgelaufene Videos wurden gelöscht.';
-    el.aufgeraeumt.hidden = false;
+    infoZeigen(el.aufgeraeumt);
   }
 }
 
@@ -2164,6 +2700,48 @@ function zeichne() {
 
   if (wochenAnsicht) zeichneWoche(); else zeichneZeitleiste();
   zeichneUebersicht();
+  heuteKarteZeichnen();
+}
+
+const WOCHENTAGE_LANG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag',
+                         'Freitag', 'Samstag', 'Sonntag'];
+
+/**
+ * Kopf der Heute-Karte: großes Datum, wer dran ist und ob schon
+ * etwas da ist. Nur Anzeige – das Hochladen darunter bleibt, wie es
+ * war.
+ */
+function heuteKarteZeichnen() {
+  const kopf = document.getElementById('heute-kopf');
+  if (!kopf) return;
+
+  const jetzt = new Date();
+  const s = schluessel(jetzt);
+  const dran = werIstDran(jetzt);
+  const ich = meinName();
+  let satz, stand;
+  let erledigt = false;
+
+  if (dran === null) {
+    satz = 'Heute ist Pausentag';
+    stand = 'Niemand ist dran. Hochladen geht trotzdem.';
+  } else {
+    const clips = clipsVon(s, dran);
+    erledigt = clips.length > 0;
+    const duBist = !!ich && ich.toLowerCase() === dran.toLowerCase();
+    satz = duBist ? 'Du bist heute dran' : escape_(dran) + ' ist heute dran';
+    stand = erledigt
+      ? (clips.length === 1 ? 'Ein Video ist da.' : clips.length + ' Clips sind da.')
+      : (duBist ? 'Noch kein Video von dir.' : 'Noch kein Video.');
+  }
+
+  kopf.classList.toggle('erledigt', erledigt);
+  kopf.innerHTML =
+      '<div class="heute-zahl" aria-hidden="true">' + jetzt.getDate() + '</div>'
+    + '<div class="heute-datum">' + WOCHENTAGE_LANG[(jetzt.getDay() + 6) % 7]
+    + ', ' + jetzt.getDate() + '. ' + MONATE[jetzt.getMonth()] + '</div>'
+    + '<div class="heute-satz">' + satz + '</div>'
+    + '<div class="heute-stand">' + stand + '</div>';
 }
 
 let umschaltTimer = null;
@@ -2196,6 +2774,7 @@ function tagZeile(tag, heuteSchluessel) {
   const dran = werIstDran(tag);
   const zeile = document.createElement('article');
   zeile.className = 'tagzeile';
+  if (s === heuteSchluessel) zeile.classList.add('ist-heute');
 
   // ---- Datumsspalte ----
   const datum = document.createElement('div');
@@ -2295,7 +2874,8 @@ function kachel(datei, gruppe, index) {
   if (datei.mimeType.indexOf('video/') === 0) {
     const play = document.createElement('div');
     play.className = 'play';
-    play.textContent = '▶';
+    play.innerHTML = '<svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">'
+                   + '<path d="M3 1.8v8.4L10 6z" fill="currentColor"/></svg>';
     k.appendChild(play);
   }
 
@@ -3042,14 +3622,34 @@ function rangliste(feld) {
     });
 }
 
+// Welche Liste gerade offen ist (nur für diese Sitzung)
+let listenTab = 'monat';
+const LISTEN_TABS = [
+  { feld: 'monat',  name: 'Monat',  titel: 'Uploads diesen Monat' },
+  { feld: 'gesamt', name: 'Gesamt', titel: 'Uploads gesamt' },
+  { feld: 'best',   name: 'Dino',   titel: 'Dino – weiteste Strecke', einheit: ' m' }
+];
+
 function zeichnePunkte() {
   el.punkte.innerHTML = '';
+
+  const leiste = document.createElement('div');
+  leiste.className = 'listen-tabs';
+  leiste.setAttribute('role', 'tablist');
+  LISTEN_TABS.forEach(function (tab) {
+    const knopf = document.createElement('button');
+    knopf.className = 'listen-tab';
+    knopf.textContent = tab.name;
+    knopf.setAttribute('role', 'tab');
+    knopf.setAttribute('aria-selected', tab.feld === listenTab ? 'true' : 'false');
+    knopf.onclick = function () { listenTab = tab.feld; zeichnePunkte(); };
+    leiste.appendChild(knopf);
+  });
+  el.punkte.appendChild(leiste);
+
+  const aktiv = LISTEN_TABS.find(function (t) { return t.feld === listenTab; });
   el.punkte.appendChild(
-    tabelle('Uploads diesen Monat', rangliste('monat'), 'monat'));
-  el.punkte.appendChild(
-    tabelle('Uploads gesamt', rangliste('gesamt'), 'gesamt'));
-  el.punkte.appendChild(
-    tabelle('Dino – weiteste Strecke', rangliste('best'), 'best', ' m'));
+    tabelle(aktiv.titel, rangliste(aktiv.feld), aktiv.feld, aktiv.einheit));
 }
 
 /** Listet auf, an welchem Tag wie viele Punkte zusammenkamen. */
@@ -3086,12 +3686,50 @@ function tabelle(titel, liste, feld, einheit) {
   kopf.textContent = titel;
   kasten.appendChild(kopf);
 
+  // Gleichstand bekommt denselben Platz
+  const raenge = [];
+  liste.forEach(function (eintrag, i) {
+    raenge.push(i > 0 && liste[i - 1][feld] === eintrag[feld] ? raenge[i - 1] : i + 1);
+  });
+  const hoechster = Math.max(1, liste.length ? liste[0][feld] : 1);
+  const istIch = function (eintrag) {
+    return meinName() && eintrag.name.toLowerCase() === meinName().toLowerCase();
+  };
+
+  // Die ersten drei als kleines Podest
+  const podest = document.createElement('div');
+  podest.className = 'podest';
+  const podestDetail = document.createElement('p');
+  podestDetail.className = 'podest-detail';
+  podestDetail.hidden = true;
+  liste.slice(0, 3).forEach(function (eintrag, i) {
+    const karte = document.createElement(feld !== 'best' ? 'button' : 'div');
+    karte.className = 'podest-platz platz-' + raenge[i] + (istIch(eintrag) ? ' ich' : '');
+    karte.innerHTML =
+        '<span class="podest-rang">' + raenge[i] + '.</span>'
+      + '<span class="podest-wert">' + eintrag[feld] + (einheit || '') + '</span>'
+      + '<span class="podest-name">' + escape_(eintrag.name) + '</span>';
+    if (feld !== 'best') {
+      karte.onclick = function () {
+        const offen = !podestDetail.hidden && podestDetail.dataset.wer === eintrag.name;
+        podestDetail.hidden = offen;
+        podestDetail.dataset.wer = eintrag.name;
+        podestDetail.textContent = eintrag.name + ': ' + herkunftText(eintrag.name, feld);
+      };
+    }
+    podest.appendChild(karte);
+  });
+  if (liste.length) {
+    kasten.appendChild(podest);
+    kasten.appendChild(podestDetail);
+  }
+
   const t = document.createElement('table');
 
   liste.forEach(function (eintrag, i) {
-    // Gleichstand bekommt denselben Platz
-    const platz = (i > 0 && liste[i - 1][feld] === eintrag[feld])
-      ? '' : (i + 1) + '.';
+    if (i < 3) return;   // stehen schon auf dem Podest
+    const platz = (raenge[i] === raenge[i - 1]) ? '' : raenge[i] + '.';
+    const anteil = Math.round(100 * (eintrag[feld] || 0) / hoechster);
 
     const zeile = document.createElement('tr');
     if (meinName() && eintrag.name.toLowerCase() === meinName().toLowerCase()) {
@@ -3099,7 +3737,8 @@ function tabelle(titel, liste, feld, einheit) {
     }
     zeile.innerHTML =
         '<td class="platz">' + platz + '</td>'
-      + '<td class="wer">' + escape_(eintrag.name) + '</td>'
+      + '<td class="wer">' + escape_(eintrag.name)
+      + '<span class="balken-anteil"><span style="width:' + anteil + '%"></span></span></td>'
       + '<td class="wert">' + eintrag[feld] + (einheit || '') + '</td>';
     t.appendChild(zeile);
 
@@ -4681,6 +5320,7 @@ function fuellePersonen() {
 // Person oder Tag zu wechseln ändert das Tageslimit – neu prüfen.
 el.person.onchange = function () {
   merkePerson();
+  heuteKarteZeichnen();
   markierungenLaden();   // "meins" hängt davon ab, wer ich bin
   pushSynchronisieren();
   zeichneEntwurf();
@@ -4706,10 +5346,40 @@ function escape_(text) {
   return d.innerHTML;
 }
 
+/** Das Textfeld einer Hinweiskarte (Symbol und × bleiben stehen). */
+function hinweisText(karte) {
+  return karte.querySelector('.hinweis-text') || karte;
+}
+
 function zeigeFehler(text) {
-  el.fehler.textContent = text;
+  hinweisText(el.fehler).textContent = text;
   el.fehler.hidden = false;
 }
+
+/**
+ * Zeigt eine Info-Karte und blendet sie nach rund sechs Sekunden
+ * wieder aus. Fehler bleiben dagegen stehen, bis man sie schließt.
+ */
+let infoTimer = null;
+function infoZeigen(karte) {
+  clearTimeout(infoTimer);
+  karte.classList.remove('verblasst');
+  karte.hidden = false;
+  const leise = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  infoTimer = setTimeout(function () {
+    if (leise) { karte.hidden = true; return; }
+    karte.classList.add('verblasst');
+    infoTimer = setTimeout(function () {
+      karte.hidden = true;
+      karte.classList.remove('verblasst');
+    }, 400);
+  }, 6000);
+}
+
+// × blendet einen Hinweis nur aus
+document.querySelectorAll('.hinweis-zu').forEach(function (knopf) {
+  knopf.onclick = function () { knopf.closest('.hinweis').hidden = true; };
+});
 </script>
 </body>
 </html>
