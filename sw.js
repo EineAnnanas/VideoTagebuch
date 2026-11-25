@@ -1,4 +1,12 @@
-const CACHE_NAME = 'tagebuch-cache-v3';
+const CACHE_NAME = 'tagebuch-cache-v4';
+
+// The page keeps downloaded videos in its own cache. It must survive
+// service worker updates, otherwise every deploy re-downloads everything.
+const SEITEN_CACHE = 'videotagebuch-dateien';
+
+// How long the network may take for the HTML before the cached copy is
+// served. The fresh copy still lands in the cache for the next launch.
+const HTML_ZEITLIMIT_MS = 3000;
 const ASSETS = [
   './',
   './index.html',
@@ -32,7 +40,10 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys
+          .filter((key) => key !== CACHE_NAME && key !== SEITEN_CACHE
+            && key.startsWith('tagebuch-cache-'))
+          .map((key) => caches.delete(key))
       ))
       .then(() => self.clients.claim())
   );
@@ -61,17 +72,28 @@ self.addEventListener('fetch', (e) => {
     url.pathname.endsWith('.html');
 
   if (isHtml) {
-    // Network-First for index.html: always fetch latest updates, fall back to cache offline
+    // Network-first for index.html, but with a time limit: on a slow
+    // mobile connection the cached copy is served after HTML_ZEITLIMIT_MS.
+    // The network request keeps running and updates the cache, so the
+    // new version is used on the next launch.
+    const ausCache = () => caches.match(e.request)
+      .then((res) => res || caches.match('./index.html'));
+
+    const vomNetz = fetch(e.request).then((res) => {
+      if (res && res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+      }
+      return res;
+    });
+
+    const zeitlimit = new Promise((resolve) => {
+      setTimeout(() => ausCache().then((res) => { if (res) resolve(res); }), HTML_ZEITLIMIT_MS);
+    });
+
     e.respondWith(
-      fetch(e.request)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(e.request).then((res) => res || caches.match('./index.html')))
+      Promise.race([vomNetz, zeitlimit])
+        .catch(() => ausCache())
     );
     return;
   }
