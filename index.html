@@ -1011,6 +1011,8 @@
     margin-bottom: 2rem;
     box-shadow: var(--schatten-karte);
   }
+  /* Ohne Anmeldung keine Heute-Karte (Klasse statt :has, damit es überall geht) */
+  body:not(.angemeldet) #heute-karte { display: none; }
   #heute-karte:has(> #hochladen-bereich[hidden]) { display: none; }
   #heute-kopf {
     display: grid;
@@ -1237,7 +1239,7 @@
       backdrop-filter: saturate(1.3) blur(14px);
       border-top: 1px solid var(--rand);
     }
-    .kopf-aktionen:not(:has(> button:not([hidden]))) { display: none; }
+    body:not(.angemeldet) .kopf-aktionen { display: none; }
     .kopf-aktionen button {
       flex: 1 1 0;
       flex-direction: column;
@@ -1275,6 +1277,146 @@
   @media (prefers-reduced-motion: reduce) {
     .kachel, .kachel:hover, .kachel:active { transition: none; transform: none; }
   }
+
+  /* ---- Begrüßung ---- */
+  #willkommen {
+    text-align: center;
+    padding: 3.5rem 1.25rem 3rem;
+    margin: 1rem auto 2rem;
+    max-width: 460px;
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(44, 43, 38, .04), 0 8px 24px rgba(44, 43, 38, .05);
+  }
+  body.angemeldet #willkommen { display: none; }
+  body:not(.angemeldet) #status,
+  body:not(.angemeldet) #fuss { display: none; }
+  #willkommen h2 {
+    font-family: var(--serif);
+    font-weight: normal;
+    font-size: 2rem;
+    margin: 0 0 .6rem;
+  }
+  #willkommen p {
+    color: var(--grau);
+    font-size: .92rem;
+    line-height: 1.5;
+    margin: 0 auto 1.6rem;
+    max-width: 34ch;
+    text-wrap: balance;
+  }
+  #willkommen #anmelden {
+    font-size: .95rem;
+    padding: .85rem 1.6rem;
+    border-radius: 10px;
+    min-height: 48px;
+  }
+
+  /* ---- Hinweiskarten ---- */
+  .hinweis {
+    display: flex;
+    align-items: flex-start;
+    gap: .65rem;
+    padding: .8rem .6rem .8rem .9rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    font-size: .84rem;
+    line-height: 1.45;
+    border: 1px solid var(--rand);
+    background: var(--flaeche);
+    color: var(--text);
+  }
+  .hinweis .hinweis-symbol { flex: 0 0 auto; margin-top: .05rem; }
+  .hinweis .hinweis-text { flex: 1; white-space: pre-wrap; padding-top: .05rem; }
+  .hinweis .hinweis-zu {
+    flex: 0 0 auto;
+    min-width: 32px; min-height: 32px;
+    margin: -.4rem -.1rem -.4rem 0;
+    font-size: 1.1rem;
+    color: inherit;
+    opacity: .6;
+  }
+  .hinweis .hinweis-zu:hover { opacity: 1; }
+  #fehler.hinweis-fehler {
+    color: #8c2f22;
+    background: #fbf3f1;
+    border-color: #d8b9b1;
+    padding: .8rem .6rem .8rem .9rem;
+    font-size: .84rem;
+  }
+  #aufgeraeumt.hinweis-info { color: var(--grau); margin: 0 0 1rem; font-size: .84rem; }
+  #aufgeraeumt.hinweis-info .hinweis-symbol { color: #6f8a5a; }
+
+  /* ---- Bestenliste: Tabs, Podest, Balken ---- */
+  #punkte { display: block; }
+  .listen-tabs {
+    display: flex;
+    gap: .25rem;
+    padding: .25rem;
+    background: var(--platz);
+    border-radius: 10px;
+    margin-bottom: 1.2rem;
+  }
+  .listen-tab {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    border-radius: 8px;
+    min-height: 36px;
+    color: var(--grau);
+    font-size: .85rem;
+  }
+  .listen-tab[aria-selected="true"] {
+    background: var(--flaeche);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(44, 43, 38, .12);
+  }
+  .bestenliste h3 { border-bottom: 0; color: var(--grau); font-family: inherit; font-size: .75rem; letter-spacing: .02em; margin-bottom: .6rem; }
+  .podest {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .5rem;
+    margin-bottom: .6rem;
+  }
+  .podest-platz {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .15rem;
+    padding: .8rem .4rem .7rem;
+    border: 1px solid var(--rand);
+    border-radius: 12px;
+    background: var(--papier);
+    font: inherit;
+    color: inherit;
+    min-height: 0;
+    text-align: center;
+  }
+  button.podest-platz { cursor: pointer; }
+  .podest-platz.platz-1 { background: var(--flaeche); border-color: #d9c79a; box-shadow: 0 4px 14px rgba(184, 134, 11, .10); }
+  .podest-rang { font-size: .72rem; color: var(--grau); }
+  .platz-1 .podest-rang { color: #b8860b; }
+  .podest-wert { font-family: var(--serif); font-size: 1.6rem; line-height: 1.1; }
+  .platz-1 .podest-wert { font-size: 1.9rem; }
+  .podest-name { font-size: .8rem; color: var(--grau); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .podest-platz.ich .podest-name { color: var(--text); font-weight: 600; }
+  .podest-detail { font-size: .72rem; color: var(--grau); margin: 0 0 .8rem; line-height: 1.45; }
+  .bestenliste .wer { padding-right: .8rem; width: 100%; }
+  .bestenliste .platz { min-width: 2rem; white-space: nowrap; }
+  #listen-inhalt { max-width: 520px; }
+  .balken-anteil {
+    display: block;
+    height: 3px;
+    margin-top: .3rem;
+    background: var(--platz);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .balken-anteil > span { display: block; height: 100%; background: var(--grau); border-radius: 2px; }
+  .bestenliste tr.ich .balken-anteil > span { background: var(--text); }
+  .bestenliste tr:first-child .wert { font-size: 1rem; }
+  .bestenliste td { padding: .4rem 0; vertical-align: top; }
 </style>
 </head>
 <body>
@@ -1282,7 +1424,6 @@
 <header>
   <div class="kopf-inhalt">
     <h1>Videotagebuch</h1>
-    <button id="anmelden" class="wichtig">Mit Google anmelden</button>
     <!-- Am Handy wird diese Gruppe zur Leiste am unteren Rand -->
     <nav class="kopf-aktionen" aria-label="Aktionen">
       <button id="ansicht" class="leise" hidden>Wochenraster</button>
@@ -1344,8 +1485,24 @@
   </div>
 </section>
 
-<div id="fehler" hidden></div>
-<p id="aufgeraeumt" hidden></p>
+<!-- Begrüßung, solange niemand angemeldet ist -->
+<section id="willkommen" aria-labelledby="willkommen-titel">
+  <h2 id="willkommen-titel">Willkommen</h2>
+  <p>Euer gemeinsames Video-Tagebuch. Melde dich mit deinem Projektkonto an.</p>
+  <button id="anmelden" class="wichtig">Mit Google anmelden</button>
+</section>
+
+<!-- Hinweise als Karten; der Text kommt in .hinweis-text -->
+<div id="fehler" class="hinweis hinweis-fehler" role="alert" hidden>
+  <svg class="hinweis-symbol" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></svg>
+  <span class="hinweis-text"></span>
+  <button class="hinweis-zu leise symbol" aria-label="Hinweis schließen" title="Schließen">&times;</button>
+</div>
+<div id="aufgeraeumt" class="hinweis hinweis-info" role="status" hidden>
+  <svg class="hinweis-symbol" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-4.8"/></svg>
+  <span class="hinweis-text"></span>
+  <button class="hinweis-zu leise symbol" aria-label="Hinweis schließen" title="Schließen">&times;</button>
+</div>
 <p id="status">Nicht angemeldet.</p>
 
 <nav id="wochenleiste" hidden>
@@ -2126,6 +2283,8 @@ function gemerktesKonto() {
 }
 
 async function angemeldet() {
+  // Steuert per CSS Begrüßung, Heute-Karte und Handy-Leiste
+  document.body.classList.add('angemeldet');
   await ensureServerConfig();
   el.anmelden.hidden = true;
   el.neuladen.hidden = false;
@@ -2464,7 +2623,7 @@ async function aufraeumen() {
     dateien = dateien.filter(function (d) {
       return geloescht.indexOf(d.id) === -1;
     });
-    el.aufgeraeumt.textContent = geloescht.length === 1
+    hinweisText(el.aufgeraeumt).textContent = geloescht.length === 1
       ? 'Ein abgelaufenes Video wurde gelöscht.'
       : geloescht.length + ' abgelaufene Videos wurden gelöscht.';
     el.aufgeraeumt.hidden = false;
@@ -3456,14 +3615,34 @@ function rangliste(feld) {
     });
 }
 
+// Welche Liste gerade offen ist (nur für diese Sitzung)
+let listenTab = 'monat';
+const LISTEN_TABS = [
+  { feld: 'monat',  name: 'Monat',  titel: 'Uploads diesen Monat' },
+  { feld: 'gesamt', name: 'Gesamt', titel: 'Uploads gesamt' },
+  { feld: 'best',   name: 'Dino',   titel: 'Dino – weiteste Strecke', einheit: ' m' }
+];
+
 function zeichnePunkte() {
   el.punkte.innerHTML = '';
+
+  const leiste = document.createElement('div');
+  leiste.className = 'listen-tabs';
+  leiste.setAttribute('role', 'tablist');
+  LISTEN_TABS.forEach(function (tab) {
+    const knopf = document.createElement('button');
+    knopf.className = 'listen-tab';
+    knopf.textContent = tab.name;
+    knopf.setAttribute('role', 'tab');
+    knopf.setAttribute('aria-selected', tab.feld === listenTab ? 'true' : 'false');
+    knopf.onclick = function () { listenTab = tab.feld; zeichnePunkte(); };
+    leiste.appendChild(knopf);
+  });
+  el.punkte.appendChild(leiste);
+
+  const aktiv = LISTEN_TABS.find(function (t) { return t.feld === listenTab; });
   el.punkte.appendChild(
-    tabelle('Uploads diesen Monat', rangliste('monat'), 'monat'));
-  el.punkte.appendChild(
-    tabelle('Uploads gesamt', rangliste('gesamt'), 'gesamt'));
-  el.punkte.appendChild(
-    tabelle('Dino – weiteste Strecke', rangliste('best'), 'best', ' m'));
+    tabelle(aktiv.titel, rangliste(aktiv.feld), aktiv.feld, aktiv.einheit));
 }
 
 /** Listet auf, an welchem Tag wie viele Punkte zusammenkamen. */
@@ -3500,12 +3679,50 @@ function tabelle(titel, liste, feld, einheit) {
   kopf.textContent = titel;
   kasten.appendChild(kopf);
 
+  // Gleichstand bekommt denselben Platz
+  const raenge = [];
+  liste.forEach(function (eintrag, i) {
+    raenge.push(i > 0 && liste[i - 1][feld] === eintrag[feld] ? raenge[i - 1] : i + 1);
+  });
+  const hoechster = Math.max(1, liste.length ? liste[0][feld] : 1);
+  const istIch = function (eintrag) {
+    return meinName() && eintrag.name.toLowerCase() === meinName().toLowerCase();
+  };
+
+  // Die ersten drei als kleines Podest
+  const podest = document.createElement('div');
+  podest.className = 'podest';
+  const podestDetail = document.createElement('p');
+  podestDetail.className = 'podest-detail';
+  podestDetail.hidden = true;
+  liste.slice(0, 3).forEach(function (eintrag, i) {
+    const karte = document.createElement(feld !== 'best' ? 'button' : 'div');
+    karte.className = 'podest-platz platz-' + raenge[i] + (istIch(eintrag) ? ' ich' : '');
+    karte.innerHTML =
+        '<span class="podest-rang">' + raenge[i] + '.</span>'
+      + '<span class="podest-wert">' + eintrag[feld] + (einheit || '') + '</span>'
+      + '<span class="podest-name">' + escape_(eintrag.name) + '</span>';
+    if (feld !== 'best') {
+      karte.onclick = function () {
+        const offen = !podestDetail.hidden && podestDetail.dataset.wer === eintrag.name;
+        podestDetail.hidden = offen;
+        podestDetail.dataset.wer = eintrag.name;
+        podestDetail.textContent = eintrag.name + ': ' + herkunftText(eintrag.name, feld);
+      };
+    }
+    podest.appendChild(karte);
+  });
+  if (liste.length) {
+    kasten.appendChild(podest);
+    kasten.appendChild(podestDetail);
+  }
+
   const t = document.createElement('table');
 
   liste.forEach(function (eintrag, i) {
-    // Gleichstand bekommt denselben Platz
-    const platz = (i > 0 && liste[i - 1][feld] === eintrag[feld])
-      ? '' : (i + 1) + '.';
+    if (i < 3) return;   // stehen schon auf dem Podest
+    const platz = (raenge[i] === raenge[i - 1]) ? '' : raenge[i] + '.';
+    const anteil = Math.round(100 * (eintrag[feld] || 0) / hoechster);
 
     const zeile = document.createElement('tr');
     if (meinName() && eintrag.name.toLowerCase() === meinName().toLowerCase()) {
@@ -3513,7 +3730,8 @@ function tabelle(titel, liste, feld, einheit) {
     }
     zeile.innerHTML =
         '<td class="platz">' + platz + '</td>'
-      + '<td class="wer">' + escape_(eintrag.name) + '</td>'
+      + '<td class="wer">' + escape_(eintrag.name)
+      + '<span class="balken-anteil"><span style="width:' + anteil + '%"></span></span></td>'
       + '<td class="wert">' + eintrag[feld] + (einheit || '') + '</td>';
     t.appendChild(zeile);
 
@@ -5121,10 +5339,20 @@ function escape_(text) {
   return d.innerHTML;
 }
 
+/** Das Textfeld einer Hinweiskarte (Symbol und × bleiben stehen). */
+function hinweisText(karte) {
+  return karte.querySelector('.hinweis-text') || karte;
+}
+
 function zeigeFehler(text) {
-  el.fehler.textContent = text;
+  hinweisText(el.fehler).textContent = text;
   el.fehler.hidden = false;
 }
+
+// × blendet einen Hinweis nur aus
+document.querySelectorAll('.hinweis-zu').forEach(function (knopf) {
+  knopf.onclick = function () { knopf.closest('.hinweis').hidden = true; };
+});
 </script>
 </body>
 </html>
