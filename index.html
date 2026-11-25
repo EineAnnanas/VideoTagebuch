@@ -147,7 +147,6 @@
     flex-wrap: wrap;
   }
   #hochladen-bereich label { font-size: .8rem; color: var(--grau); }
-  #spielknopf { margin-left: auto; }
   #hochladen-status { order: 10; flex-basis: 100%; font-size: .8rem; color: var(--grau); }
   #hochladen-status:empty { display: none; }
   #balken {
@@ -999,6 +998,9 @@
   }
   #neuladen { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 11a8 8 0 1 0-2.3 5.7'/%3E%3Cpath d='M20 4v7h-7'/%3E%3C/svg%3E"); }
   #listenknopf { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z'/%3E%3Cpath d='M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3'/%3E%3C/svg%3E"); }
+  /* Kleiner Dino (Kopf, Auge, Rücken, Beine) für das Spiel */
+  #spielknopf { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 4h5a2 2 0 0 1 2 2v2h-5v3l-3 3H7l-4-3'/%3E%3Cpath d='M15 8v6a4 4 0 0 1-4 4H9'/%3E%3Cpath d='M9 18v2M13 17v3'/%3E%3Ccircle cx='16.5' cy='6' r='.4' fill='black'/%3E%3C/svg%3E"); }
+  body:not(.angemeldet) #spielknopf { display: none; }
   #wechseln { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21a8 8 0 0 1 16 0'/%3E%3C/svg%3E"); }
   #ansicht { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E"); }
 
@@ -1247,8 +1249,9 @@
       align-items: center;
       gap: .25rem;
       min-height: 52px;
-      padding: .35rem .25rem;
-      font-size: .7rem;
+      padding: .35rem .15rem;
+      font-size: .68rem;
+      white-space: nowrap;
       color: var(--grau);
     }
     .kopf-aktionen button[hidden] { display: none; }
@@ -1258,7 +1261,6 @@
     .heute-zahl { font-size: 3.5rem; }
     .heute-satz { font-size: 1.25rem; }
     #waehlen { flex: 1 1 100%; order: 5; }
-    #spielknopf { order: 6; margin: 0 auto; }
 
     .datumspalte { flex-basis: 40px; }
     .datumspalte .zahl { font-size: 1.55rem; }
@@ -1347,6 +1349,12 @@
   }
   #aufgeraeumt.hinweis-info { color: var(--grau); margin: 0 0 1rem; font-size: .84rem; }
   #aufgeraeumt.hinweis-info .hinweis-symbol { color: #6f8a5a; }
+  /* Infos blenden nach ein paar Sekunden von selbst aus */
+  #aufgeraeumt { transition: opacity .4s ease; }
+  #aufgeraeumt.verblasst { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    #aufgeraeumt { transition: none; }
+  }
 
   /* ---- Bestenliste: Tabs, Podest, Balken ---- */
   #punkte { display: block; }
@@ -1429,6 +1437,7 @@
       <button id="ansicht" class="leise" hidden>Wochenraster</button>
       <button id="neuladen" class="leise" hidden>Neu laden</button>
       <button id="listenknopf" class="leise" hidden>Bestenliste</button>
+      <button id="spielknopf" class="leise" title="Dino-Spiel">Spiel</button>
       <button id="wechseln" class="leise" hidden>Konto wechseln</button>
     </nav>
   </div>
@@ -1457,7 +1466,6 @@
   <button id="waehlen" class="wichtig">Videos auswählen</button>
   <input type="file" id="datei" accept="video/*,image/*" multiple hidden>
   <span id="hochladen-status"></span>
-  <button id="spielknopf" class="leise">Spielen</button>
   <div id="balken" hidden><div></div></div>
 </div>
 </section>
@@ -2626,7 +2634,7 @@ async function aufraeumen() {
     hinweisText(el.aufgeraeumt).textContent = geloescht.length === 1
       ? 'Ein abgelaufenes Video wurde gelöscht.'
       : geloescht.length + ' abgelaufene Videos wurden gelöscht.';
-    el.aufgeraeumt.hidden = false;
+    infoZeigen(el.aufgeraeumt);
   }
 }
 
@@ -5347,6 +5355,26 @@ function hinweisText(karte) {
 function zeigeFehler(text) {
   hinweisText(el.fehler).textContent = text;
   el.fehler.hidden = false;
+}
+
+/**
+ * Zeigt eine Info-Karte und blendet sie nach rund sechs Sekunden
+ * wieder aus. Fehler bleiben dagegen stehen, bis man sie schließt.
+ */
+let infoTimer = null;
+function infoZeigen(karte) {
+  clearTimeout(infoTimer);
+  karte.classList.remove('verblasst');
+  karte.hidden = false;
+  const leise = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  infoTimer = setTimeout(function () {
+    if (leise) { karte.hidden = true; return; }
+    karte.classList.add('verblasst');
+    infoTimer = setTimeout(function () {
+      karte.hidden = true;
+      karte.classList.remove('verblasst');
+    }, 400);
+  }, 6000);
 }
 
 // × blendet einen Hinweis nur aus
