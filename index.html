@@ -588,14 +588,6 @@
   body.handy .datumspalte .zahl { font-size: 1.4rem; }
 
   @media (max-width: 560px) {
-    /* Die leisen Knöpfe stehen ohne Rahmen da; ihr Text soll bündig
-       mit dem Titel beginnen. Dafür rückt der Bereich um ihren
-       Innenabstand nach links, Titel und Konto wieder zurück. */
-    .kopf-inhalt { gap: .15rem 0; margin-left: -.6rem; }
-    .kopf-inhalt h1 { flex-basis: 100%; margin-bottom: .35rem; padding-left: .6rem; }
-    .kopf-inhalt button.leise { padding-inline: .6rem; }
-    .kopf-inhalt button.wichtig { margin-left: .6rem; }
-    #konto { flex-basis: 100%; margin-top: .3rem; padding-left: .6rem; }
     /* Die Handy-Vorschau ergibt nur am großen Bildschirm Sinn */
     body:not(.handy) #handyknopf { display: none; }
     .datumspalte { flex: 0 0 52px; }
@@ -604,12 +596,7 @@
   }
 
   #aufgeraeumt { font-size: .8rem; color: var(--grau); margin: 0 0 1rem; }
-  /* Konto als ruhige Zeile unter Titel und Knöpfen. Am großen
-     Bildschirm teilt es sich die Zeile mit "Handy-Ansicht" (rechts),
-     am Handy steht es allein. */
-  #konto { flex: 1 0 14rem; order: 1; font-size: .75rem; color: var(--grau); }
-  #konto:empty { display: none; }
-  #handyknopf { order: 2; }
+  #konto { font-size: .75rem; color: var(--grau); }
   #konto.falsch { color: #8c2f22; }
   #status { color: var(--grau); }
   #fehler {
@@ -949,6 +936,345 @@
     border: 1px solid #d8b9b1;
     color: #8c2f22;
   }
+
+  /* ================================================================
+     MODERNISIERUNG
+     Gleiche Farben und Schriften, neue Anordnung:
+     – Kopf klebt oben, halbdurchsichtig.
+     – Die Heute-Karte ist das eine große Element der Seite.
+     – Die Zeitleiste hängt an einer durchgehenden Linie ("Rücken"
+       des Tagebuchs), jeder Tag ist ein Punkt darauf.
+     – Am Handy wandern die Aktionen in eine Leiste am unteren Rand.
+     Abstände in Schritten von .25rem, Radien nach Rolle:
+     Bedienelemente 8 px, Bilder 10 px, Karten 16 px.
+     ================================================================ */
+
+  :root {
+    --schatten-karte: 0 1px 0 rgba(44, 43, 38, .04), 0 14px 34px -22px rgba(44, 43, 38, .28);
+    --glas: rgba(250, 249, 245, .84);
+    --gold: #b8860b;
+  }
+
+  body { padding-top: 0; }
+  button, select { border-radius: 8px; }
+
+  /* ---- Kopf: klebt oben, Inhalt scheint leicht durch ---- */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    align-items: center;
+    margin: 0 -1rem 1.5rem;
+    padding: calc(.7rem + env(safe-area-inset-top, 0px)) 1rem .7rem;
+    border-bottom: 1px solid var(--rand);
+    isolation: isolate;
+  }
+  /* Der Glas-Hintergrund liegt auf einer eigenen Ebene: ein
+     backdrop-filter direkt am Kopf würde die feste Leiste unten
+     (am Handy) an den Kopf binden statt an den Bildschirm. */
+  header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--glas);
+    -webkit-backdrop-filter: saturate(1.3) blur(14px);
+    backdrop-filter: saturate(1.3) blur(14px);
+  }
+  .kopf-inhalt { align-items: center; gap: .5rem; }
+  h1 { font-size: 1.4rem; letter-spacing: -.01em; }
+  .kopf-aktionen { display: flex; align-items: center; gap: .1rem; }
+  #btn-open-settings::before { content: none; }
+
+  /* Symbole für die Aktionen (als Maske, damit sie die Textfarbe
+     übernehmen und JS den Beschriftungstext frei setzen kann) */
+  .kopf-aktionen button::before {
+    content: "";
+    display: none;
+    width: 20px;
+    height: 20px;
+    background: currentColor;
+    -webkit-mask: var(--symbol) center / contain no-repeat;
+    mask: var(--symbol) center / contain no-repeat;
+  }
+  #neuladen { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 11a8 8 0 1 0-2.3 5.7'/%3E%3Cpath d='M20 4v7h-7'/%3E%3C/svg%3E"); }
+  #listenknopf { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z'/%3E%3Cpath d='M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3'/%3E%3C/svg%3E"); }
+  #wechseln { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21a8 8 0 0 1 16 0'/%3E%3C/svg%3E"); }
+  #ansicht { --symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E"); }
+
+  /* ---- Heute-Karte: das eine große Element ---- */
+  #heute-karte {
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 16px;
+    padding: 1.25rem 1.25rem 1rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--schatten-karte);
+  }
+  #heute-karte:has(> #hochladen-bereich[hidden]) { display: none; }
+  #heute-kopf {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 1.1rem;
+    align-items: end;
+    margin-bottom: 1.1rem;
+  }
+  #heute-kopf:empty { display: none; }
+  .heute-zahl {
+    grid-row: 1 / span 3;
+    align-self: center;
+    font-family: var(--serif);
+    font-size: 4.2rem;
+    line-height: .85;
+    letter-spacing: -.03em;
+    font-variant-numeric: lining-nums;
+  }
+  .heute-datum { font-size: .8rem; color: var(--grau); }
+  .heute-satz { font-family: var(--serif); font-size: 1.45rem; line-height: 1.2; margin: .1rem 0 .2rem; }
+  .heute-stand {
+    font-size: .84rem;
+    color: var(--grau);
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+  }
+  .heute-stand::before {
+    content: "";
+    width: 8px; height: 8px; border-radius: 50%;
+    border: 1.5px solid var(--grau);
+    flex: 0 0 auto;
+  }
+  #heute-kopf.erledigt .heute-stand { color: var(--text); }
+  #heute-kopf.erledigt .heute-stand::before { background: var(--text); border-color: var(--text); }
+
+  #hochladen-bereich {
+    border: 0;
+    border-top: 1px solid var(--rand);
+    border-radius: 0;
+    background: none;
+    padding: 1rem 0 0;
+    margin: 0;
+    gap: .5rem .6rem;
+  }
+  #heute-kopf:empty + #hochladen-bereich { border-top: 0; padding-top: 0; }
+  #waehlen { min-height: 44px; padding-inline: 1.15rem; border-radius: 10px; font-size: .9rem; }
+  #balken { height: 6px; border-radius: 3px; }
+
+  /* ---- Zeitleiste am Rücken ---- */
+  .tagzeile { border-top: 0; padding: 0; gap: .9rem; }
+  .tagzeile:first-child { padding-top: 0; }
+  .datumspalte { flex-basis: 64px; padding-top: .05rem; }
+  .datumspalte .zahl { font-size: 1.9rem; line-height: 1; }
+  .datumspalte .heute {
+    border: 0;
+    background: var(--text);
+    color: var(--papier);
+    padding: .05rem .45rem;
+    margin-top: .35rem;
+  }
+
+  .tagzeile > .inhalt {
+    position: relative;
+    border-left: 1px solid var(--rand);
+    padding: .2rem 0 1.9rem 1.25rem;
+  }
+  .tagzeile:last-child > .inhalt { padding-bottom: .5rem; }
+  /* Punkt auf dem Rücken: gefüllt = Video da, hohl = nichts */
+  .tagzeile > .inhalt::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: .7rem;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--text);
+    box-shadow: 0 0 0 4px var(--papier);
+  }
+  .tagzeile.leerlauf > .inhalt::before { background: var(--papier); border: 1.5px solid var(--blass); }
+  /* Heute: Ring statt Punkt, eng genug, dass er die Zahl nicht berührt */
+  .tagzeile.ist-heute > .inhalt::before {
+    background: var(--papier);
+    border: 2px solid var(--text);
+    box-shadow: 0 0 0 3px var(--papier);
+  }
+
+  .tagzeile .wer { font-size: 1.15rem; margin-bottom: .6rem; }
+  .tagzeile .wer span { margin-left: .3rem; }
+
+  /* Clips: größere Bilder; bei vielen scrollt die Reihe seitlich */
+  .clips {
+    gap: .5rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: 2px 2px 4px;
+    margin: -2px -2px -4px;
+  }
+  .clips::-webkit-scrollbar { display: none; }
+  .kachel {
+    flex: 0 0 auto;
+    width: 136px;
+    max-width: none;
+    border-radius: 10px;
+    scroll-snap-align: start;
+    box-shadow: 0 1px 2px rgba(44, 43, 38, .14);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  @media (hover: hover) {
+    .kachel:hover { transform: translateY(-2px); box-shadow: 0 8px 18px -10px rgba(44, 43, 38, .45); }
+  }
+  .kachel:active { transform: scale(.97); }
+  /* Abspiel-Zeichen klein unten links statt mitten über dem Bild */
+  .kachel .play {
+    inset: auto auto .45rem .45rem;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(20, 19, 17, .55);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    text-shadow: none;
+  }
+  .kachel .play svg { margin-left: 2px; }
+  .kachel .stern { top: .4rem; right: .4rem; width: 22px; height: 22px; border-radius: 11px; font-size: .78rem; }
+  .kachel .wartet { align-items: center; padding: .5rem; }
+
+  .keins, .pausenfeld { border-radius: 10px; padding: .85rem 1rem; }
+  .extraknopf { margin-left: -.85rem; }
+
+  /* ---- Kommentare als Sprechblasen ---- */
+  .kommentare { margin-top: .9rem; }
+  .kommentarliste { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; }
+  .kommentar {
+    max-width: min(92%, 480px);
+    margin: 0;
+    padding: .45rem .75rem .5rem;
+    border: 1px solid var(--rand);
+    border-radius: 14px 14px 14px 4px;
+    background: var(--flaeche);
+  }
+  /* Eigene Kommentare (nur die haben "löschen") rechts und getönt */
+  .kommentar:has(.loeschen) {
+    align-self: flex-end;
+    border-radius: 14px 14px 4px 14px;
+    background: #f1eee4;
+    border-color: transparent;
+  }
+  .kommentar .kopf { gap: .4rem; }
+  .kommentar .loeschen { margin-right: -.4rem; }
+  .kommentarform textarea { border-radius: 10px; max-width: none; }
+  .kommentarform { max-width: 560px; }
+
+  /* ---- Wochenraster ---- */
+  .tagspalte .kachel { width: auto; }
+  .tagspalte.heute .tagkopf { border-bottom-width: 2px; }
+
+  /* ---- Übersicht als Kacheln ---- */
+  #uebersicht { border-top: 0; margin-top: 1.5rem; padding-top: 0; }
+  #zahlen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .6rem;
+    margin-bottom: .75rem;
+  }
+  #zahlen .kennzahl {
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 16px;
+    padding: .8rem .95rem .85rem;
+  }
+  #zahlen .kennzahl .titel { font-size: .75rem; }
+  #zahlen .kennzahl .wert { font-size: 1.6rem; line-height: 1.15; margin-top: .15rem; }
+  #raster {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--flaeche);
+    border: 1px solid var(--rand);
+    border-radius: 16px;
+    padding: .7rem 1rem;
+  }
+
+  /* ---- Fuß mit Konto ---- */
+  #fuss {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-top: 2.5rem;
+    padding-top: .9rem;
+    border-top: 1px solid var(--rand);
+  }
+  #fuss #handyknopf { margin-right: -.85rem; font-size: .78rem; }
+
+  /* ---- Dialoge: weicher Hintergrund, runde Karten ---- */
+  #overlay, #listen {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  #overlay-inhalt, #listen-inhalt { border-radius: 16px; }
+  /* Über Kopf (30) und Handy-Leiste (40), unter den Einstellungen (100) */
+  #overlay, #listen { z-index: 70; }
+  #fehler { border-radius: 12px; }
+
+  /* ---- Handy ---- */
+  @media (max-width: 560px) {
+    body { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
+    header { margin-bottom: 1.1rem; }
+    h1 { font-size: 1.3rem; }
+
+    /* Aktionen als Leiste unten, mit Symbol über der Beschriftung */
+    .kopf-aktionen {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 40;
+      justify-content: space-around;
+      gap: 0;
+      padding: .3rem .5rem calc(.3rem + env(safe-area-inset-bottom, 0px));
+      background: rgba(255, 254, 251, .9);
+      -webkit-backdrop-filter: saturate(1.3) blur(14px);
+      backdrop-filter: saturate(1.3) blur(14px);
+      border-top: 1px solid var(--rand);
+    }
+    .kopf-aktionen:not(:has(> button:not([hidden]))) { display: none; }
+    .kopf-aktionen button {
+      flex: 1 1 0;
+      flex-direction: column;
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+      min-height: 52px;
+      padding: .35rem .25rem;
+      font-size: .7rem;
+      color: var(--grau);
+    }
+    .kopf-aktionen button[hidden] { display: none; }
+    .kopf-aktionen button::before { display: block; }
+
+    #heute-karte { padding: 1.1rem 1rem .95rem; margin-bottom: 1.6rem; }
+    .heute-zahl { font-size: 3.5rem; }
+    .heute-satz { font-size: 1.25rem; }
+    #waehlen { flex: 1 1 100%; order: 5; }
+    #spielknopf { order: 6; margin: 0 auto; }
+
+    .datumspalte { flex-basis: 40px; }
+    .datumspalte .zahl { font-size: 1.55rem; }
+    .datumspalte .monat { font-size: .68rem; }
+    .tagzeile { gap: .6rem; }
+    .tagzeile > .inhalt { padding-left: 1rem; }
+    /* Zweieinhalb Bilder sichtbar: man sieht, dass es weitergeht */
+    .kachel { width: calc((100% - 1rem) / 2.35); }
+
+    #zahlen { gap: .45rem; }
+    #zahlen .kennzahl { padding: .7rem .75rem; border-radius: 14px; }
+    #zahlen .kennzahl .wert { font-size: 1.3rem; }
+    #fuss { flex-wrap: wrap; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kachel, .kachel:hover, .kachel:active { transition: none; transform: none; }
+  }
 </style>
 </head>
 <body>
@@ -957,12 +1283,13 @@
   <div class="kopf-inhalt">
     <h1>Videotagebuch</h1>
     <button id="anmelden" class="wichtig">Mit Google anmelden</button>
-    <button id="ansicht" class="leise" hidden>Wochenraster</button>
-    <button id="neuladen" class="leise" hidden>Neu laden</button>
-    <button id="listenknopf" class="leise" hidden>Bestenliste</button>
-    <button id="wechseln" class="leise" hidden>Konto wechseln</button>
-    <button id="handyknopf" class="leise">Handy-Ansicht</button>
-    <span id="konto"></span>
+    <!-- Am Handy wird diese Gruppe zur Leiste am unteren Rand -->
+    <nav class="kopf-aktionen" aria-label="Aktionen">
+      <button id="ansicht" class="leise" hidden>Wochenraster</button>
+      <button id="neuladen" class="leise" hidden>Neu laden</button>
+      <button id="listenknopf" class="leise" hidden>Bestenliste</button>
+      <button id="wechseln" class="leise" hidden>Konto wechseln</button>
+    </nav>
   </div>
   <button id="btn-open-settings" title="Einstellungen" aria-label="Einstellungen" aria-haspopup="dialog" aria-controls="settings-backdrop">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -972,6 +1299,11 @@
   </button>
 </header>
 
+<!-- Die Karte für heute: wer dran ist, ob schon etwas da ist, und
+     direkt darunter das Hochladen. Ohne Anmeldung unsichtbar, weil
+     dann auch der Hochladebereich versteckt ist. -->
+<section id="heute-karte" aria-label="Heute">
+<div id="heute-kopf"></div>
 <div id="hochladen-bereich" hidden>
   <label for="person">Ich bin</label>
   <select id="person"></select>
@@ -987,6 +1319,7 @@
   <button id="spielknopf" class="leise">Spielen</button>
   <div id="balken" hidden><div></div></div>
 </div>
+</section>
 
 <section id="spiel" hidden>
   <div class="spielkopf">
@@ -1030,6 +1363,11 @@
   <div id="zahlen"></div>
   <table id="raster"></table>
 </section>
+
+<footer id="fuss">
+  <span id="konto"></span>
+  <button id="handyknopf" class="leise">Handy-Ansicht</button>
+</footer>
 
 <div id="listen" hidden>
   <div id="listen-inhalt">
@@ -2196,6 +2534,48 @@ function zeichne() {
 
   if (wochenAnsicht) zeichneWoche(); else zeichneZeitleiste();
   zeichneUebersicht();
+  heuteKarteZeichnen();
+}
+
+const WOCHENTAGE_LANG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag',
+                         'Freitag', 'Samstag', 'Sonntag'];
+
+/**
+ * Kopf der Heute-Karte: großes Datum, wer dran ist und ob schon
+ * etwas da ist. Nur Anzeige – das Hochladen darunter bleibt, wie es
+ * war.
+ */
+function heuteKarteZeichnen() {
+  const kopf = document.getElementById('heute-kopf');
+  if (!kopf) return;
+
+  const jetzt = new Date();
+  const s = schluessel(jetzt);
+  const dran = werIstDran(jetzt);
+  const ich = meinName();
+  let satz, stand;
+  let erledigt = false;
+
+  if (dran === null) {
+    satz = 'Heute ist Pausentag';
+    stand = 'Niemand ist dran. Hochladen geht trotzdem.';
+  } else {
+    const clips = clipsVon(s, dran);
+    erledigt = clips.length > 0;
+    const duBist = !!ich && ich.toLowerCase() === dran.toLowerCase();
+    satz = duBist ? 'Du bist heute dran' : escape_(dran) + ' ist heute dran';
+    stand = erledigt
+      ? (clips.length === 1 ? 'Ein Video ist da.' : clips.length + ' Clips sind da.')
+      : (duBist ? 'Noch kein Video von dir.' : 'Noch kein Video.');
+  }
+
+  kopf.classList.toggle('erledigt', erledigt);
+  kopf.innerHTML =
+      '<div class="heute-zahl" aria-hidden="true">' + jetzt.getDate() + '</div>'
+    + '<div class="heute-datum">' + WOCHENTAGE_LANG[(jetzt.getDay() + 6) % 7]
+    + ', ' + jetzt.getDate() + '. ' + MONATE[jetzt.getMonth()] + '</div>'
+    + '<div class="heute-satz">' + satz + '</div>'
+    + '<div class="heute-stand">' + stand + '</div>';
 }
 
 let umschaltTimer = null;
@@ -2228,6 +2608,7 @@ function tagZeile(tag, heuteSchluessel) {
   const dran = werIstDran(tag);
   const zeile = document.createElement('article');
   zeile.className = 'tagzeile';
+  if (s === heuteSchluessel) zeile.classList.add('ist-heute');
 
   // ---- Datumsspalte ----
   const datum = document.createElement('div');
@@ -2327,7 +2708,8 @@ function kachel(datei, gruppe, index) {
   if (datei.mimeType.indexOf('video/') === 0) {
     const play = document.createElement('div');
     play.className = 'play';
-    play.textContent = '▶';
+    play.innerHTML = '<svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">'
+                   + '<path d="M3 1.8v8.4L10 6z" fill="currentColor"/></svg>';
     k.appendChild(play);
   }
 
@@ -4713,6 +5095,7 @@ function fuellePersonen() {
 // Person oder Tag zu wechseln ändert das Tageslimit – neu prüfen.
 el.person.onchange = function () {
   merkePerson();
+  heuteKarteZeichnen();
   markierungenLaden();   // "meins" hängt davon ab, wer ich bin
   pushSynchronisieren();
   zeichneEntwurf();
