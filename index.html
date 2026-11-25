@@ -7,7 +7,7 @@
 
   <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="96x96" href="assets/icons/favicon-96x96.png">
-  <link rel="shortcut icon" href="iassets/cons/favicon.ico">
+  <link rel="shortcut icon" href="assets/icons/favicon.ico">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
 
   <link rel="manifest" href="manifest.webmanifest">
@@ -1169,16 +1169,16 @@ async function loadServerConfig() {
   }
 
   try {
-    const res = await fetch(`${serverUrl}/api/config`);
+    const res = await mitZeitlimit(`${serverUrl}/api/config`, {}, 4000);
     if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
 
     const serverConfig = await res.json();
 
     // Fill your existing CONFIG object with the data from the Raspberry Pi
-    CONFIG.REIHENFOLGE = serverConfig.reihenfolge || [];
-    CONFIG.ZYKLUS_START = serverConfig.zyklus_start || '';
-    CONFIG.KONTEN_HASHES = serverConfig.konten_hashes || [];
-    CONFIG.VAPID_PUBLIC_KEY = serverConfig.vapid_public_key || '';
+    konfigUebernehmen(serverConfig);
+    try {
+      localStorage.setItem(KONFIG_SPEICHER, JSON.stringify({ url: serverUrl, daten: serverConfig }));
+    } catch (e) {}
 
     return true;
   } catch (err) {
@@ -1187,9 +1187,51 @@ async function loadServerConfig() {
   }
 }
 
+/**
+ * fetch mit Zeitlimit. Der Pi hängt am Heimnetz und kann langsam oder
+ * weg sein – das darf den Start der App nicht aufhalten.
+ */
+function mitZeitlimit(url, optionen, ms) {
+  const abbruch = new AbortController();
+  const timer = setTimeout(function () { abbruch.abort(); }, ms || 4000);
+  return fetch(url, Object.assign({}, optionen, { signal: abbruch.signal }))
+    .finally(function () { clearTimeout(timer); });
+}
+
+function konfigUebernehmen(serverConfig) {
+  CONFIG.REIHENFOLGE = serverConfig.reihenfolge || [];
+  CONFIG.ZYKLUS_START = serverConfig.zyklus_start || '';
+  CONFIG.KONTEN_HASHES = serverConfig.konten_hashes || [];
+  CONFIG.VAPID_PUBLIC_KEY = serverConfig.vapid_public_key || '';
+}
+
+const KONFIG_SPEICHER = 'tagebuch_server_config';
+
+/** Die zuletzt geladene Konfiguration – nur, wenn sie zur Server-URL passt. */
+function gemerkteKonfig() {
+  try {
+    const roh = JSON.parse(localStorage.getItem(KONFIG_SPEICHER));
+    const url = localStorage.getItem('tagebuch_server_url');
+    return roh && roh.url === url ? roh.daten : null;
+  } catch (e) { return null; }
+}
+
+/**
+ * Liegt eine Konfiguration vom letzten Mal vor, gilt sie sofort und
+ * die frische kommt nebenher. Sonst wird auf den Server gewartet.
+ */
 let serverConfigPromise = null;
 function ensureServerConfig() {
-  if (!serverConfigPromise) serverConfigPromise = loadServerConfig();
+  if (!serverConfigPromise) {
+    const gemerkt = gemerkteKonfig();
+    const frisch = loadServerConfig();
+    if (gemerkt) {
+      konfigUebernehmen(gemerkt);
+      serverConfigPromise = Promise.resolve(true);
+    } else {
+      serverConfigPromise = frisch;
+    }
+  }
   return serverConfigPromise;
 }
 
@@ -1712,7 +1754,9 @@ async function angemeldet() {
   el.neuladen.hidden = false;
   el.ansicht.hidden = false;
   el.wechseln.hidden = false;
-  if (await zeigeKonto()) laden();
+  // Kontoprüfung und Ordnerliste laufen gleichzeitig. Angezeigt wird
+  // trotzdem erst, wenn das Konto zum Projekt gehört (siehe laden()).
+  laden(zeigeKonto());
 }
 
 async function sha256(text) {
@@ -1859,6 +1903,7 @@ el.wechseln.onclick = function () {
     sessionStorage.removeItem('videotagebuch.zugang');
     localStorage.removeItem('videotagebuch.konto');
   } catch (e) {}
+  zwischenstandLoeschen();
   el.fehler.hidden = true;
   tokenClient.requestAccessToken({ prompt: 'select_account' });
 };
@@ -1926,26 +1971,39 @@ async function ordnerHolen() {
   return antwort.files;
 }
 
+/**
+ * Alle Ordner gleichzeitig abfragen – nacheinander kostete jeder
+ * Ordner eine volle Runde zu Google. Mehr als 200 Dateien in einem
+ * Ordner kommen seitenweise (nextPageToken).
+ */
 async function dateienHolen() {
   const quellen = [{ id: CONFIG.ORDNER_ID, name: '(Hauptordner)' }].concat(unterordner);
-  const ergebnis = [];
 
-  for (const ordner of quellen) {
-    const inhalt = await drive('files', {
-      q: "'" + ordner.id + "' in parents"
-         + " and mimeType!='application/vnd.google-apps.folder' and trashed=false",
-      fields: 'files(id,name,mimeType,createdTime,size,thumbnailLink,'
-            + 'owners(emailAddress),capabilities(canDelete))',
-      orderBy: 'createdTime desc',
-      pageSize: 200
-    });
-    inhalt.files.forEach(function (datei) {
-      datei.ordner = ordner.name;
-      datei.tagSchluessel = tagAus(datei);
-      ergebnis.push(datei);
-    });
-  }
-  return ergebnis;
+  const jeOrdner = await Promise.all(quellen.map(async function (ordner) {
+    const gefunden = [];
+    let seite = null;
+    do {
+      const params = {
+        q: "'" + ordner.id + "' in parents"
+           + " and mimeType!='application/vnd.google-apps.folder' and trashed=false",
+        fields: 'nextPageToken,files(id,name,mimeType,createdTime,size,thumbnailLink,'
+              + 'owners(emailAddress),capabilities(canDelete))',
+        orderBy: 'createdTime desc',
+        pageSize: 200
+      };
+      if (seite) params.pageToken = seite;
+      const inhalt = await drive('files', params);
+      (inhalt.files || []).forEach(function (datei) {
+        datei.ordner = ordner.name;
+        datei.tagSchluessel = tagAus(datei);
+        gefunden.push(datei);
+      });
+      seite = inhalt.nextPageToken || null;
+    } while (seite);
+    return gefunden;
+  }));
+
+  return [].concat.apply([], jeOrdner);
 }
 
 /** Trennt die Punktedateien von den Videos. */
@@ -1953,13 +2011,32 @@ function istPunktedatei(datei) {
   return (datei.name || '').indexOf(CONFIG.PUNKTE_PRAEFIX) === 0;
 }
 
-async function laden() {
+/**
+ * Lädt alles neu. Reihenfolge nach dem, was man zuerst sehen will:
+ *   1. Ordner und Dateien → sofort zeichnen
+ *   2. Punkte und Kommentare gleichzeitig → noch einmal zeichnen
+ *   3. Aufräumen nebenher, ohne darauf zu warten
+ *
+ * kontoPruefung: Promise aus zeigeKonto(). Gehört das Konto nicht
+ * zum Projekt, wird nichts Frisches angezeigt.
+ */
+async function laden(kontoPruefung) {
   el.fehler.hidden = true;
   el.status.hidden = false;
-  el.status.textContent = 'Lade …';
+  el.status.textContent = standAngezeigt ? 'Aktualisiere …' : 'Lade …';
+  vorladenFrei = false;
 
   try {
-    unterordner = await ordnerHolen();
+    const [kontoOk, ordner] = await Promise.all([
+      kontoPruefung || Promise.resolve(true),
+      ordnerHolen()
+    ]);
+    if (!kontoOk) {
+      el.status.hidden = true;
+      return;
+    }
+
+    unterordner = ordner;
     fuellePersonen();
 
     const alles = await dateienHolen();
@@ -1970,21 +2047,133 @@ async function laden() {
     punkteDateien = alles.filter(istPunktedatei);
     dateien = alles.filter(function (d) { return !istPunktedatei(d); });
 
-    if (CONFIG.AUTO_LOESCHEN) await aufraeumen();
+    standAngezeigt = false;
+    zeichne();
+    ersteAnzeigeMessen('Drive');
+    el.status.textContent = 'Aktualisiere …';
 
-    await punkteLaden();
-
+    // Was die Zeitleiste ergänzt, aber nicht für die erste Anzeige
+    // nötig ist – alles gleichzeitig. Weitere Quellen hier anhängen.
     kommentare = {};
-    await kommentareVorladen(alleAnker());
-    cacheAufraeumen();          // nebenher
+    const nachladen = [
+      punkteLaden(),
+      kommentareVorladen(alleAnker())
+    ];
+    await Promise.all(nachladen);
 
     el.status.hidden = true;
     zeichne();
+    zwischenstandSpeichern();
+    setTimeout(vorladenFreigeben, 2000);
+    cacheAufraeumen();          // nebenher
+
+    if (CONFIG.AUTO_LOESCHEN) {
+      aufraeumen().then(function (anzahl) {
+        if (anzahl) { zeichne(); zwischenstandSpeichern(); }
+      }).catch(function (e) { console.warn('Aufräumen fehlgeschlagen:', e); });
+    }
   } catch (fehler) {
     el.status.hidden = true;
     zeigeFehler(fehler.message);
   }
 }
+
+
+// ============ ZWISCHENSTAND ============
+//
+// Beim Öffnen sofort das zeigen, was beim letzten Mal geladen war –
+// noch vor der Anmeldung. Dahinter lädt die Seite wie gewohnt neu und
+// zeichnet dann frisch. Gespeichert wird nur, was zum Zeichnen nötig
+// ist, und nur für das zuletzt benutzte Konto.
+
+const STAND_SCHLUESSEL = 'videotagebuch.stand';
+const STAND_MAX_ZEICHEN = 2 * 1024 * 1024;
+let standAngezeigt = false;
+
+function zwischenstandSpeichern() {
+  if (!meineMail) return;
+  const stand = {
+    v: 1,
+    konto: meineMail,
+    zeit: Date.now(),
+    unterordner: unterordner.map(function (o) { return { id: o.id, name: o.name }; }),
+    dateien: dateien.map(function (d) {
+      return {
+        id: d.id, name: d.name, mimeType: d.mimeType,
+        createdTime: d.createdTime, size: d.size,
+        thumbnailLink: d.thumbnailLink, owners: d.owners,
+        capabilities: d.capabilities, ordner: d.ordner,
+        tagSchluessel: d.tagSchluessel
+      };
+    }),
+    punkte: punkte,
+    kommentare: kommentare
+  };
+  try {
+    const text = JSON.stringify(stand);
+    if (text.length > STAND_MAX_ZEICHEN) {
+      console.warn('Zwischenstand zu groß (' + text.length + ' Zeichen), nicht gespeichert.');
+      localStorage.removeItem(STAND_SCHLUESSEL);
+      return;
+    }
+    localStorage.setItem(STAND_SCHLUESSEL, text);
+  } catch (e) {
+    console.warn('Zwischenstand konnte nicht gespeichert werden:', e);
+  }
+}
+
+function zwischenstandLoeschen() {
+  try { localStorage.removeItem(STAND_SCHLUESSEL); } catch (e) {}
+}
+
+function zwischenstandZeigen() {
+  let stand = null;
+  try { stand = JSON.parse(localStorage.getItem(STAND_SCHLUESSEL)); } catch (e) {}
+  if (!stand || stand.v !== 1 || !Array.isArray(stand.dateien)) return;
+
+  // Nur für das Konto, das sich auch gleich wieder anmeldet
+  const konto = gemerktesKonto();
+  if (!konto || stand.konto !== konto) return;
+  if (token) return;   // schon angemeldet – laden() ist dran
+
+  ensureServerConfig();   // übernimmt die gemerkte Konfiguration sofort
+  if (!CONFIG.REIHENFOLGE || !CONFIG.REIHENFOLGE.length) return;
+
+  unterordner = stand.unterordner || [];
+  dateien = stand.dateien;
+  punkte = stand.punkte || {};
+  kommentare = stand.kommentare || {};
+
+  standAngezeigt = true;
+  fuellePersonen();
+  zeichne();
+  ersteAnzeigeMessen('Zwischenstand');
+
+  const uhr = new Date(stand.zeit);
+  const standVon = 'Stand von '
+    + String(uhr.getHours()).padStart(2, '0') + ':'
+    + String(uhr.getMinutes()).padStart(2, '0');
+  el.status.hidden = false;
+  el.status.textContent = standVon + ' · aktualisiere …';
+
+  // Klappt die stille Anmeldung nicht, nicht ewig „aktualisiere“ zeigen
+  setTimeout(function () {
+    if (!token && standAngezeigt) {
+      el.status.textContent = standVon + ' · zum Aktualisieren anmelden';
+    }
+  }, 8000);
+}
+
+let ersteAnzeigeGemessen = false;
+function ersteAnzeigeMessen(quelle) {
+  if (ersteAnzeigeGemessen) return;
+  ersteAnzeigeGemessen = true;
+  try { performance.mark('vt:erste-anzeige'); } catch (e) {}
+  console.info('[vt] erste Anzeige nach ' + Math.round(performance.now())
+    + ' ms (' + quelle + ')');
+}
+
+document.addEventListener('DOMContentLoaded', zwischenstandZeigen);
 
 
 // ============ AUFRÄUMEN ============
@@ -2014,7 +2203,7 @@ async function aufraeumen() {
     return meins && darf && new Date(d.createdTime).getTime() < grenze;
   });
 
-  if (!abgelaufen.length) return;
+  if (!abgelaufen.length) return 0;
 
   el.status.hidden = false;
   el.status.textContent = 'Räume ' + abgelaufen.length + ' abgelaufene auf …';
@@ -2040,6 +2229,8 @@ async function aufraeumen() {
       : geloescht.length + ' abgelaufene Videos wurden gelöscht.';
     el.aufgeraeumt.hidden = false;
   }
+  el.status.hidden = true;
+  return geloescht.length;
 }
 
 
@@ -2068,7 +2259,7 @@ function zeichne() {
 let umschaltTimer = null;
 window.addEventListener('resize', function () {
   clearTimeout(umschaltTimer);
-  if (token) umschaltTimer = setTimeout(zeichne, 150);
+  if (token || standAngezeigt) umschaltTimer = setTimeout(zeichne, 150);
 });
 
 
@@ -2083,6 +2274,7 @@ function zeichneZeitleiste() {
 
   el.zeitleiste.innerHTML = '';
   vorgeladeneTage = 0;
+  vorladenWartet = [];
   const heute = schluessel(new Date());
 
   for (let i = 0; i < CONFIG.ZEITLEISTE_TAGE; i++) {
@@ -2180,9 +2372,20 @@ function kachel(datei, gruppe, index) {
 
   if (datei.thumbnailLink) {
     const img = document.createElement('img');
-    img.src = datei.thumbnailLink.replace(/=s\d+$/, '=s400');
+    img.loading = 'lazy';
+    img.decoding = 'async';
     img.referrerPolicy = 'no-referrer';
     img.alt = '';
+    // Vorschaubild-Links von Google laufen nach einigen Stunden ab –
+    // aus dem Zwischenstand kann einer schon tot sein. Dann bis zum
+    // frischen Laden einen schlichten Platzhalter zeigen.
+    img.onerror = function () {
+      const ersatz = document.createElement('div');
+      ersatz.className = 'wartet';
+      ersatz.textContent = 'Vorschau folgt';
+      if (img.parentNode) img.parentNode.replaceChild(ersatz, img);
+    };
+    img.src = datei.thumbnailLink.replace(/=s\d+$/, '=s400');
     k.appendChild(img);
   } else {
     const wartet = document.createElement('div');
@@ -3753,7 +3956,19 @@ function schontDaten() {
   return !!(v && (v.saveData || /^([23]g|slow-2g)$/.test(v.effectiveType || '')));
 }
 
+// Vorladen startet erst kurz nach dem vollständigen Laden – vorher
+// konkurriert es mit den Vorschaubildern und der Seite selbst.
+let vorladenFrei = false;
+let vorladenWartet = [];
+
+function vorladenFreigeben() {
+  vorladenFrei = true;
+  vorladenWartet.splice(0).forEach(vorladenPlanen);
+}
+
 function vorladenPlanen(clips) {
+  if (!token) return;
+  if (!vorladenFrei) { vorladenWartet.push(clips); return; }
   if (!CONFIG.VORLADEN || schontDaten()) return;
   if (vorgeladeneTage >= CONFIG.VORLADEN_MAX_TAGE) return;
   vorgeladeneTage++;
